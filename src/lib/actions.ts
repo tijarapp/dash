@@ -95,41 +95,73 @@ export async function deleteCategory(id: string) {
   revalidatePath('/categories');
 }
 
-/// Adjusts a user's gold + dinar balance and records a matching transaction.
-export async function adjustUserBalance(formData: FormData) {
-  await requireAdmin();
-  const userId = String(formData.get('userId') ?? '');
-  const delta = Number(formData.get('amount') ?? 0);
-  if (!userId || !delta) return;
+/// Charges a user's gold + dinar balance and records a matching transaction.
+export async function chargeUserBalance(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    await requireAdmin();
+    const userId = String(formData.get('userId') ?? '');
+    const amount = Number(formData.get('amount') ?? 0);
 
-  if (DEMO_MODE) {
+    if (!userId) return { error: 'يرجى اختيار مستخدم' };
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { error: 'أدخل مبلغاً موجباً للشحن' };
+    }
+
+    if (DEMO_MODE) {
+      revalidatePath('/charge');
+      revalidatePath('/users');
+      revalidatePath('/transactions');
+      return { error: null };
+    }
+
+    const userRef = adminDb.collection('users').doc(userId);
+    await adminDb.runTransaction(async (txn) => {
+      const snap = await txn.get(userRef);
+      if (!snap.exists) throw new Error('المستخدم غير موجود');
+
+      const gold = Number(snap.data()?.goldBalance) || 0;
+      const dinar = Number(snap.data()?.dinarBalance) || 0;
+
+      txn.update(userRef, {
+        goldBalance: gold + amount,
+        dinarBalance: dinar + amount,
+      });
+
+      const txnRef = adminDb.collection('transactions').doc();
+      txn.set(txnRef, {
+        userId,
+        type: 'charge',
+        goldAmount: amount,
+        dinarAmount: amount,
+        status: 'completed',
+        note: 'شحن رصيد من لوحة التحكم',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      const notifRef = adminDb.collection('notifications').doc();
+      txn.set(notifRef, {
+        userId,
+        title: 'تم شحن الرصيد',
+        body: `تم شحن رصيدك بمبلغ ${amount.toLocaleString('ar')}.`,
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    revalidatePath('/charge');
     revalidatePath('/users');
-    return;
+    revalidatePath('/investors');
+    revalidatePath('/transactions');
+    revalidatePath('/notifications');
+    revalidatePath(`/users/${userId}`);
+    return { error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'فشل شحن الرصيد';
+    return { error: message };
   }
-
-  const userRef = adminDb.collection('users').doc(userId);
-  await adminDb.runTransaction(async (txn) => {
-    const snap = await txn.get(userRef);
-    if (!snap.exists) throw new Error('User not found');
-    const gold = Number(snap.data()?.goldBalance) || 0;
-    const dinar = Number(snap.data()?.dinarBalance) || 0;
-    txn.update(userRef, {
-      goldBalance: gold + delta,
-      dinarBalance: dinar + delta,
-    });
-    const txnRef = adminDb.collection('transactions').doc();
-    txn.set(txnRef, {
-      userId,
-      type: delta >= 0 ? 'charge' : 'withdraw',
-      goldAmount: delta,
-      dinarAmount: delta,
-      status: 'completed',
-      note: 'تعديل من لوحة التحكم',
-      createdAt: FieldValue.serverTimestamp(),
-    });
-  });
-  revalidatePath('/users');
-  revalidatePath(`/users/${userId}`);
 }
 
 function withdrawApprovalNotification(userId: string, amount: number) {

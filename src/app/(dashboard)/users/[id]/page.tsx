@@ -1,7 +1,6 @@
 import NavAnchor from '@/components/NavAnchor';
 import { notFound } from 'next/navigation';
 import { getUserDetail } from '@/lib/data';
-import AdjustBalanceForm from '@/components/AdjustBalanceForm';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
@@ -76,12 +75,6 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           <StatBox label="إجمالي الأرباح" value={stats.totalProfit.toLocaleString()} accent="text-green-600" />
           <StatBox label="المعاملات" value={stats.transactionCount.toLocaleString()} />
         </div>
-      </Card>
-
-      {/* Balance Adjustment */}
-      <Card>
-        <h2 className="mb-4 font-semibold text-gray-900">تعديل الرصيد</h2>
-        <AdjustBalanceForm userId={user.id} />
       </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
