@@ -1,4 +1,5 @@
 import { adminDb } from './firebaseAdmin';
+import { CATEGORY_DURATION_MONTHS } from './categoryProfit';
 import {
   DEMO_MODE,
   demoCategories,
@@ -17,7 +18,6 @@ export interface CategoryRow {
   dailyProfitRate: number;
   minInvestment: number;
   durationMonths: number;
-  annualYield: number;
   isActive: boolean;
 }
 
@@ -154,8 +154,7 @@ export async function listCategories(): Promise<CategoryRow[]> {
       imageUrl: d.imageUrl ?? '',
       dailyProfitRate: Number(d.dailyProfitRate) || 0,
       minInvestment: Number(d.minInvestment) || 0,
-      durationMonths: Number(d.durationMonths) || 0,
-      annualYield: Number(d.annualYield) || 0,
+      durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
       isActive: Boolean(d.isActive),
     };
   });
@@ -174,8 +173,7 @@ export async function getCategoryById(id: string): Promise<CategoryRow | null> {
     imageUrl: d.imageUrl ?? '',
     dailyProfitRate: Number(d.dailyProfitRate) || 0,
     minInvestment: Number(d.minInvestment) || 0,
-    durationMonths: Number(d.durationMonths) || 0,
-    annualYield: Number(d.annualYield) || 0,
+    durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
     isActive: Boolean(d.isActive),
   };
 }
@@ -367,9 +365,11 @@ export async function getUserById(id: string): Promise<UserRow | null> {
   };
 }
 
-export async function getUserNameMap(): Promise<Map<string, string>> {
+export async function getUserNameMap(): Promise<Record<string, string>> {
   const users = await listUsers();
-  return new Map(users.map((u) => [u.id, u.name || u.phone || u.id.slice(0, 8)]));
+  return Object.fromEntries(
+    users.map((u) => [u.id, u.name || u.phone || u.id.slice(0, 8)]),
+  );
 }
 
 export async function getUserDetail(id: string): Promise<UserDetail | null> {

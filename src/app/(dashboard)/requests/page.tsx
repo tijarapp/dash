@@ -33,7 +33,7 @@ export default async function RequestsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <SyncWithdrawTransactionsButton />
             <NavAnchor
-              href="/users"
+              href="/charge"
               className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
               شحن رصيد مستخدم

@@ -6,8 +6,24 @@ import { redirect } from 'next/navigation';
 import { adminDb } from './firebaseAdmin';
 import { requireAdmin } from './session';
 import { DEMO_MODE } from './demo';
+import {
+  CATEGORY_DURATION_MONTHS,
+  validateDailyProfitRate,
+} from './categoryProfit';
 
 export type FormActionState = { error: string | null };
+
+function categoryFinancialFields(formData: FormData) {
+  const dailyProfitRate = Number(formData.get('dailyProfitRate') ?? 0);
+  const rateError = validateDailyProfitRate(dailyProfitRate);
+  if (rateError) throw new Error(rateError);
+
+  return {
+    dailyProfitRate,
+    minInvestment: Number(formData.get('minInvestment') ?? 0),
+    durationMonths: CATEGORY_DURATION_MONTHS,
+  };
+}
 
 export async function createCategory(
   _prev: FormActionState,
@@ -15,6 +31,8 @@ export async function createCategory(
 ): Promise<FormActionState> {
   try {
     await requireAdmin();
+    const financial = categoryFinancialFields(formData);
+
     if (DEMO_MODE) {
       revalidatePath('/categories');
       return { error: null };
@@ -24,10 +42,7 @@ export async function createCategory(
       title: String(formData.get('title') ?? ''),
       description: String(formData.get('description') ?? ''),
       imageUrl: String(formData.get('imageUrl') ?? ''),
-      dailyProfitRate: Number(formData.get('dailyProfitRate') ?? 0),
-      minInvestment: Number(formData.get('minInvestment') ?? 0),
-      durationMonths: Number(formData.get('durationMonths') ?? 12),
-      annualYield: Number(formData.get('annualYield') ?? 0),
+      ...financial,
       isActive: true,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -52,11 +67,9 @@ export async function updateCategory(
       title: String(formData.get('title') ?? ''),
       description: String(formData.get('description') ?? ''),
       imageUrl: String(formData.get('imageUrl') ?? ''),
-      dailyProfitRate: Number(formData.get('dailyProfitRate') ?? 0),
-      minInvestment: Number(formData.get('minInvestment') ?? 0),
-      durationMonths: Number(formData.get('durationMonths') ?? 12),
-      annualYield: Number(formData.get('annualYield') ?? 0),
+      ...categoryFinancialFields(formData),
       isActive: formData.get('isActive') === 'true',
+      annualYield: FieldValue.delete(),
     };
 
     if (DEMO_MODE) {

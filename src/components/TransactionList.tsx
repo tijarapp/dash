@@ -1,9 +1,13 @@
+'use client';
+
 import NavAnchor from '@/components/NavAnchor';
 import type { TransactionRow } from '@/lib/data';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 
 const typeLabels: Record<string, string> = {
   charge: 'شحن',
@@ -35,8 +39,8 @@ function TransactionCard({
 
   return (
     <Card className="transition hover:shadow-md">
-      <div className="flex items-center gap-4">
-        <NavAnchor href={`/users/${transaction.userId}`}>
+      <div className="flex items-start gap-3 sm:items-center sm:gap-4">
+        <NavAnchor href={`/users/${transaction.userId}`} className="shrink-0">
           <Avatar name={userName} size="sm" />
         </NavAnchor>
         <div className="min-w-0 flex-1">
@@ -53,13 +57,13 @@ function TransactionCard({
             <Badge status={transaction.status} />
           </div>
           {transaction.note && (
-            <p className="mt-1 text-sm text-gray-500">{transaction.note}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-gray-500">{transaction.note}</p>
           )}
           <p className="mt-1 text-xs text-gray-400">{formatDate(transaction.createdAt)}</p>
         </div>
-        <div className="text-left">
+        <div className="shrink-0 text-left">
           <p
-            className={`text-lg font-bold ${transaction.dinarAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+            className={`text-base font-bold sm:text-lg ${transaction.dinarAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}
           >
             {transaction.dinarAmount >= 0 ? '+' : ''}
             {transaction.dinarAmount.toLocaleString()}
@@ -76,8 +80,11 @@ export default function TransactionList({
   userMap,
 }: {
   transactions: TransactionRow[];
-  userMap: Map<string, string>;
+  userMap: Record<string, string>;
 }) {
+  const { pageItems, page, setPage, totalPages, totalItems, from, to } =
+    usePagination(transactions);
+
   if (transactions.length === 0) {
     return (
       <Card>
@@ -88,13 +95,21 @@ export default function TransactionList({
 
   return (
     <div className="space-y-3">
-      {transactions.map((t) => (
+      {pageItems.map((t) => (
         <TransactionCard
           key={t.id}
           transaction={t}
-          userName={userMap.get(t.userId) ?? t.userId.slice(0, 10)}
+          userName={userMap[t.userId] ?? t.userId.slice(0, 10)}
         />
       ))}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        from={from}
+        to={to}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import DailyProfitSlider from '@/components/DailyProfitSlider';
 import type { CategoryRow } from '@/lib/data';
 import FormField, { inputClass } from '@/components/ui/FormField';
 import ImageUploadField from '@/components/ui/ImageUploadField';
@@ -48,31 +49,8 @@ export default function CategoryFormFields({
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
           التفاصيل المالية
         </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FormField label="نسبة الربح اليومي %" hint="النسبة اليومية">
-            <input
-              name="dailyProfitRate"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              defaultValue={category?.dailyProfitRate}
-              placeholder="0.45"
-              className={inputClass}
-            />
-          </FormField>
-          <FormField label="العائد السنوي %" hint="العائد السنوي التقريبي">
-            <input
-              name="annualYield"
-              type="number"
-              step="0.1"
-              min="0"
-              required
-              defaultValue={category?.annualYield}
-              placeholder="16.4"
-              className={inputClass}
-            />
-          </FormField>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <DailyProfitSlider defaultValue={category?.dailyProfitRate} />
           <FormField label="الحد الأدنى للاستثمار" hint="بالدينار أو الذهب">
             <input
               name="minInvestment"
@@ -81,17 +59,6 @@ export default function CategoryFormFields({
               required
               defaultValue={category?.minInvestment}
               placeholder="500"
-              className={inputClass}
-            />
-          </FormField>
-          <FormField label="مدة الاستثمار (أشهر)" hint="مدة العقد">
-            <input
-              name="durationMonths"
-              type="number"
-              min="1"
-              required
-              defaultValue={category?.durationMonths}
-              placeholder="12"
               className={inputClass}
             />
           </FormField>

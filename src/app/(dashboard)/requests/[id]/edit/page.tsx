@@ -11,7 +11,7 @@ export default async function EditWithdrawPage({ params }: { params: Promise<{ i
   const [request, userMap] = await Promise.all([getWithdrawRequestById(id), getUserNameMap()]);
   if (!request) notFound();
 
-  const userName = userMap.get(request.userId) ?? request.userId;
+  const userName = userMap[request.userId] ?? request.userId;
 
   return (
     <div className="space-y-6">

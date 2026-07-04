@@ -6,4 +6,52 @@ html,
 body {
   background-color: #f4f6fa;
   color: #19213d;
+  overflow-x: hidden;
 }
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.daily-profit-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 0.75rem;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #86efac, #22c55e, #86efac);
+  outline: none;
+}
+
+.daily-profit-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+  cursor: grab;
+}
+
+.daily-profit-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.08);
+}
+
+.daily-profit-slider::-moz-range-thumb {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+  cursor: grab;
+}
+
+.daily-profit-slider::-moz-range-track {
+  height: 0.75rem;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #86efac, #22c55e, #86efac);
+}
+

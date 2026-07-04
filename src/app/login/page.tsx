@@ -64,10 +64,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-8 shadow-sm"
+        className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-5 shadow-sm sm:p-8"
       >
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-lg font-bold text-white">
