@@ -81,6 +81,9 @@ function WithdrawList({ withdrawRequests }: { withdrawRequests: WithdrawRow[] })
             <div className="min-w-0">
               <p className="font-medium text-gray-900">{w.cardHolder}</p>
               <p className="text-xs text-gray-400">{formatDate(w.createdAt)}</p>
+              {w.adminNote ? (
+                <p className="mt-1 text-xs text-red-600">سبب الرفض: {w.adminNote}</p>
+              ) : null}
             </div>
             <div className="shrink-0 text-left">
               <p className="font-semibold text-red-600">{w.amount.toLocaleString()}</p>

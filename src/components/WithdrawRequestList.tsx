@@ -83,6 +83,12 @@ function WithdrawCard({
           </div>
 
           <p className="mt-2 text-xs text-gray-400">{formatDate(request.createdAt)}</p>
+
+          {request.adminNote ? (
+            <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <span className="font-medium">سبب الرفض:</span> {request.adminNote}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3 sm:flex-col sm:items-end sm:border-0 sm:pt-0">

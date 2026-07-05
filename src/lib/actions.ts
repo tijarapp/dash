@@ -187,11 +187,18 @@ function withdrawApprovalNotification(userId: string, amount: number) {
   };
 }
 
-function withdrawRejectionNotification(userId: string, amount: number) {
+function withdrawRejectionNotification(
+  userId: string,
+  amount: number,
+  adminNote?: string,
+) {
+  const notePart = adminNote?.trim()
+    ? ` السبب: ${adminNote.trim()}`
+    : '';
   return {
     userId,
     title: 'تم رفض طلب السحب',
-    body: `تم رفض طلب السحب بمبلغ ${amount.toLocaleString('ar')} دينار. تم إعادة المبلغ إلى رصيدك.`,
+    body: `تم رفض طلب السحب بمبلغ ${amount.toLocaleString('ar')} دينار. تم إعادة المبلغ إلى رصيدك.${notePart}`,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   };
@@ -288,6 +295,7 @@ export async function updateWithdrawRequest(formData: FormData) {
   const cardNumber = String(formData.get('cardNumber') ?? '');
   const swift = String(formData.get('swift') ?? '');
   const newStatus = String(formData.get('status') ?? 'pending');
+  const adminNote = String(formData.get('adminNote') ?? '').trim();
 
   if (DEMO_MODE) {
     revalidatePath('/requests');
@@ -333,6 +341,10 @@ export async function updateWithdrawRequest(formData: FormData) {
     newStatus === 'rejected' &&
     (oldStatus === 'pending' || oldStatus === 'approved')
   ) {
+    if (!adminNote) {
+      throw new Error('يرجى كتابة سبب الرفض للمستخدم');
+    }
+
     await adminDb.runTransaction(async (txn) => {
       const freshSnap = await txn.get(reqRef);
       if (!freshSnap.exists) return;
@@ -368,9 +380,15 @@ export async function updateWithdrawRequest(formData: FormData) {
         cardNumber,
         swift,
         status: 'rejected',
+        adminNote: adminNote || null,
       });
       for (const ref of withdrawTxnRefs) {
-        txn.update(ref, { status: 'rejected', note: 'طلب سحب مرفوض' });
+        txn.update(ref, {
+          status: 'rejected',
+          note: adminNote
+            ? `طلب سحب مرفوض: ${adminNote}`
+            : 'طلب سحب مرفوض',
+        });
       }
 
       const txnRef = adminDb.collection('transactions').doc();
@@ -385,7 +403,10 @@ export async function updateWithdrawRequest(formData: FormData) {
       });
 
       const notifRef = adminDb.collection('notifications').doc();
-      txn.set(notifRef, withdrawRejectionNotification(targetUserId, refundAmount));
+      txn.set(
+        notifRef,
+        withdrawRejectionNotification(targetUserId, refundAmount, adminNote),
+      );
     });
   } else {
     await reqRef.update({
@@ -406,8 +427,13 @@ export async function updateWithdrawRequest(formData: FormData) {
   redirect('/requests');
 }
 
-export async function rejectWithdraw(id: string) {
+export async function rejectWithdraw(formData: FormData) {
   await requireAdmin();
+  const id = String(formData.get('id') ?? '');
+  const adminNote = String(formData.get('adminNote') ?? '').trim();
+  if (!id) return;
+  if (!adminNote) return;
+
   if (DEMO_MODE) {
     revalidatePath('/requests');
     return;
@@ -439,9 +465,15 @@ export async function rejectWithdraw(id: string) {
       goldBalance: gold + amount,
       dinarBalance: dinar + amount,
     });
-    txn.update(reqRef, { status: 'rejected' });
+    txn.update(reqRef, {
+      status: 'rejected',
+      adminNote,
+    });
     for (const ref of pendingTxnRefs) {
-      txn.update(ref, { status: 'rejected', note: 'طلب سحب مرفوض' });
+      txn.update(ref, {
+        status: 'rejected',
+        note: `طلب سحب مرفوض: ${adminNote}`,
+      });
     }
 
     const txnRef = adminDb.collection('transactions').doc();
@@ -456,7 +488,10 @@ export async function rejectWithdraw(id: string) {
     });
 
     const notifRef = adminDb.collection('notifications').doc();
-    txn.set(notifRef, withdrawRejectionNotification(data.userId, amount));
+    txn.set(
+      notifRef,
+      withdrawRejectionNotification(data.userId, amount, adminNote),
+    );
   });
   revalidatePath('/requests');
   revalidatePath('/transactions');
@@ -519,6 +554,45 @@ export async function syncWithdrawTransactionsWithRequests() {
 
   revalidatePath('/requests');
   revalidatePath('/transactions');
+}
+
+/// Updates global app settings used by the mobile app.
+export async function updateAppSettings(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    await requireAdmin();
+
+    const appVersion = String(formData.get('appVersion') ?? '').trim();
+    const supportWhatsapp = String(formData.get('supportWhatsapp') ?? '').trim();
+    const chargeRequestNumber = String(formData.get('chargeRequestNumber') ?? '').trim();
+
+    if (!appVersion) return { error: 'أدخل إصدار التطبيق' };
+    if (!supportWhatsapp) return { error: 'أدخل رقم واتساب الدعم' };
+    if (!chargeRequestNumber) return { error: 'أدخل رقم طلبات الشحن' };
+
+    if (DEMO_MODE) {
+      revalidatePath('/settings');
+      return { error: null };
+    }
+
+    await adminDb.doc('settings/app').set(
+      {
+        appVersion,
+        supportWhatsapp,
+        chargeRequestNumber,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    revalidatePath('/settings');
+    return { error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'فشل حفظ الإعدادات';
+    return { error: message };
+  }
 }
 
 /// Sends a notification to a specific user or broadcasts to all users.

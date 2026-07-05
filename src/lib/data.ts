@@ -2,6 +2,7 @@ import { adminDb } from './firebaseAdmin';
 import { CATEGORY_DURATION_MONTHS } from './categoryProfit';
 import {
   DEMO_MODE,
+  demoAppSettings,
   demoCategories,
   demoDashboardData,
   demoOverviewStats,
@@ -9,6 +10,12 @@ import {
   demoUsers,
   demoWithdrawRequests,
 } from './demo';
+
+export interface AppSettings {
+  appVersion: string;
+  supportWhatsapp: string;
+  chargeRequestNumber: string;
+}
 
 export interface CategoryRow {
   id: string;
@@ -50,6 +57,7 @@ export interface WithdrawRow {
   cardNumber: string;
   swift: string;
   status: string;
+  adminNote: string | null;
   createdAt: string | null;
 }
 
@@ -237,6 +245,7 @@ export async function listWithdrawRequests(): Promise<WithdrawRow[]> {
       cardNumber: d.cardNumber ?? '',
       swift: d.swift ?? '',
       status: d.status ?? 'pending',
+      adminNote: d.adminNote ?? null,
       createdAt: isoFrom(d.createdAt),
     };
   });
@@ -256,7 +265,30 @@ export async function getWithdrawRequestById(id: string): Promise<WithdrawRow | 
     cardNumber: d.cardNumber ?? '',
     swift: d.swift ?? '',
     status: d.status ?? 'pending',
+    adminNote: d.adminNote ?? null,
     createdAt: isoFrom(d.createdAt),
+  };
+}
+
+const APP_SETTINGS_DOC = 'settings/app';
+
+export async function getAppSettings(): Promise<AppSettings> {
+  if (DEMO_MODE) return { ...demoAppSettings };
+
+  const snap = await adminDb.doc(APP_SETTINGS_DOC).get();
+  if (!snap.exists) {
+    return {
+      appVersion: '',
+      supportWhatsapp: '',
+      chargeRequestNumber: '',
+    };
+  }
+
+  const d = snap.data()!;
+  return {
+    appVersion: String(d.appVersion ?? ''),
+    supportWhatsapp: String(d.supportWhatsapp ?? ''),
+    chargeRequestNumber: String(d.chargeRequestNumber ?? ''),
   };
 }
 

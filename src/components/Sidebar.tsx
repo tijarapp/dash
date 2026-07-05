@@ -12,6 +12,7 @@ const links = [
   { href: '/requests', label: 'طلبات السحب' },
   { href: '/transactions', label: 'المعاملات' },
   { href: '/notifications', label: 'الإشعارات' },
+  { href: '/settings', label: 'الإعدادات' },
 ];
 
 function isActivePath(pathname: string, href: string) {

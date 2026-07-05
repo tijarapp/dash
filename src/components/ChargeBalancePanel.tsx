@@ -5,6 +5,7 @@ import { chargeUserBalance, type FormActionState } from '@/lib/actions';
 import type { UserRow } from '@/lib/data';
 import Avatar from '@/components/ui/Avatar';
 import Card from '@/components/ui/Card';
+import ConfirmForm from '@/components/ui/ConfirmForm';
 import FormField, { inputClass } from '@/components/ui/FormField';
 import SubmitButton from '@/components/ui/SubmitButton';
 
@@ -191,7 +192,13 @@ export default function ChargeBalancePanel({ users }: { users: UserRow[] }) {
               <p className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">{success}</p>
             ) : null}
 
-            <form action={handleSubmit} className="space-y-4">
+            <ConfirmForm
+              action={handleSubmit}
+              title="تأكيد شحن الرصيد"
+              message={`هل تريد شحن رصيد ${selected.name || selected.phone || 'المستخدم'} بمبلغ ${Number(amount || 0).toLocaleString('ar')}؟`}
+              confirmLabel="نعم، شحن الرصيد"
+              className="space-y-4"
+            >
               <input type="hidden" name="userId" value={selected.id} />
               <FormField label="مبلغ الشحن" hint="سيتم إضافة المبلغ إلى رصيد الذهب والدينار">
                 <input
@@ -209,7 +216,7 @@ export default function ChargeBalancePanel({ users }: { users: UserRow[] }) {
               <div className="flex justify-end">
                 <SubmitButton pendingText="جاري الشحن...">شحن الرصيد</SubmitButton>
               </div>
-            </form>
+            </ConfirmForm>
           </div>
         )}
       </Card>

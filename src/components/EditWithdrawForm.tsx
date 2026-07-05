@@ -1,7 +1,11 @@
+'use client';
+
+import { useState } from 'react';
 import NavAnchor from '@/components/NavAnchor';
 import { updateWithdrawRequest } from '@/lib/actions';
 import type { WithdrawRow } from '@/lib/data';
 import Card from '@/components/ui/Card';
+import ConfirmForm from '@/components/ui/ConfirmForm';
 import FormField, { inputClass } from '@/components/ui/FormField';
 import FormPendingOverlay from '@/components/ui/FormPendingOverlay';
 import SubmitButton from '@/components/ui/SubmitButton';
@@ -13,6 +17,11 @@ export default function EditWithdrawForm({
   request: WithdrawRow;
   userName: string;
 }) {
+  const [status, setStatus] = useState(request.status);
+  const willReject =
+    status === 'rejected' &&
+    (request.status === 'pending' || request.status === 'approved');
+
   return (
     <Card>
       <div className="mb-6 flex items-center gap-3 border-b border-gray-100 pb-5">
@@ -27,7 +36,28 @@ export default function EditWithdrawForm({
         </div>
       </div>
 
-      <form action={updateWithdrawRequest} className="relative space-y-8">
+      <ConfirmForm
+        action={updateWithdrawRequest}
+        title="تأكيد حفظ التعديلات"
+        message={
+          willReject
+            ? 'سيتم رفض الطلب وإعادة المبلغ إلى رصيد المستخدم. تأكد من كتابة سبب الرفض.'
+            : 'هل تريد حفظ تعديلات طلب السحب؟'
+        }
+        confirmLabel="نعم، حفظ"
+        danger={willReject}
+        noteField={
+          willReject
+            ? {
+                name: 'adminNote',
+                label: 'سبب الرفض للمستخدم',
+                placeholder: 'مثال: بيانات البطاقة غير صحيحة',
+                required: true,
+              }
+            : undefined
+        }
+        className="relative space-y-8"
+      >
         <FormPendingOverlay message="جاري حفظ التعديلات..." />
         <input type="hidden" name="id" value={request.id} />
 
@@ -55,7 +85,12 @@ export default function EditWithdrawForm({
               />
             </FormField>
             <FormField label="الحالة">
-              <select name="status" defaultValue={request.status} className={inputClass}>
+              <select
+                name="status"
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+                className={inputClass}
+              >
                 <option value="pending">معلق</option>
                 <option value="approved">معتمد</option>
                 <option value="rejected">مرفوض</option>
@@ -98,12 +133,18 @@ export default function EditWithdrawForm({
           </div>
         </section>
 
-        {request.status !== 'rejected' && (
+        {request.adminNote ? (
+          <div className="rounded-xl border border-red-100 bg-red-50/50 px-4 py-3 text-sm text-red-700">
+            <strong>سبب الرفض الحالي:</strong> {request.adminNote}
+          </div>
+        ) : null}
+
+        {request.status !== 'rejected' ? (
           <div className="rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3 text-sm text-amber-800">
             <strong>ملاحظة:</strong> الرصيد يُخصم عند إنشاء الطلب. قبول الطلب لا يخصم مرة أخرى.
-            تغيير الحالة إلى «مرفوض» يعيد المبلغ إلى رصيد المستخدم.
+            تغيير الحالة إلى «مرفوض» يعيد المبلغ إلى رصيد المستخدم ويتطلب سبب رفض.
           </div>
-        )}
+        ) : null}
 
         <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-5">
           <NavAnchor
@@ -114,7 +155,7 @@ export default function EditWithdrawForm({
           </NavAnchor>
           <SubmitButton pendingText="جاري الحفظ...">حفظ التعديلات</SubmitButton>
         </div>
-      </form>
+      </ConfirmForm>
     </Card>
   );
 }

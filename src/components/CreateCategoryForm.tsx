@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { createCategory, type FormActionState } from '@/lib/actions';
 import CategoryFormFields from '@/components/CategoryFormFields';
 import Card from '@/components/ui/Card';
+import ConfirmForm from '@/components/ui/ConfirmForm';
 import SubmitButton from '@/components/ui/SubmitButton';
 
 const initialState: FormActionState = { error: null };
@@ -24,7 +25,13 @@ export default function CreateCategoryForm() {
         </div>
       </div>
 
-      <form action={formAction} className="space-y-8">
+      <ConfirmForm
+        action={formAction}
+        title="تأكيد إنشاء الفئة"
+        message="هل تريد إنشاء فئة الاستثمار بهذه البيانات؟"
+        confirmLabel="نعم، إنشاء الفئة"
+        className="space-y-8"
+      >
         {state.error ? (
           <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{state.error}</p>
         ) : null}
@@ -36,7 +43,7 @@ export default function CreateCategoryForm() {
             إنشاء الفئة
           </SubmitButton>
         </div>
-      </form>
+      </ConfirmForm>
     </Card>
   );
 }

@@ -1,5 +1,8 @@
+'use client';
+
 import { sendNotification } from '@/lib/actions';
 import Card from '@/components/ui/Card';
+import ConfirmForm from '@/components/ui/ConfirmForm';
 import FormField, { inputClass } from '@/components/ui/FormField';
 import FormPendingOverlay from '@/components/ui/FormPendingOverlay';
 import SubmitButton from '@/components/ui/SubmitButton';
@@ -17,7 +20,13 @@ export default function SendNotificationForm() {
         </div>
       </div>
 
-      <form action={sendNotification} className="relative space-y-6">
+      <ConfirmForm
+        action={sendNotification}
+        title="تأكيد إرسال الإشعار"
+        message="هل تريد إرسال هذا الإشعار؟ إذا تركت معرّف المستخدم فارغاً سيصل للجميع."
+        confirmLabel="نعم، إرسال"
+        className="relative space-y-6"
+      >
         <FormPendingOverlay message="جاري إرسال الإشعار..." />
         <section>
           <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -67,7 +76,7 @@ export default function SendNotificationForm() {
         <div className="flex items-center justify-end border-t border-gray-100 pt-5">
           <SubmitButton pendingText="جاري الإرسال...">إرسال الإشعار</SubmitButton>
         </div>
-      </form>
+      </ConfirmForm>
     </Card>
   );
 }

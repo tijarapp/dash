@@ -6,6 +6,7 @@ import { updateCategory, type FormActionState } from '@/lib/actions';
 import type { CategoryRow } from '@/lib/data';
 import CategoryFormFields from '@/components/CategoryFormFields';
 import Card from '@/components/ui/Card';
+import ConfirmForm from '@/components/ui/ConfirmForm';
 import SubmitButton from '@/components/ui/SubmitButton';
 
 const initialState: FormActionState = { error: null };
@@ -26,7 +27,13 @@ export default function EditCategoryForm({ category }: { category: CategoryRow }
         </div>
       </div>
 
-      <form action={formAction} className="space-y-8">
+      <ConfirmForm
+        action={formAction}
+        title="تأكيد حفظ التعديلات"
+        message={`هل تريد حفظ تعديلات فئة «${category.title}»؟`}
+        confirmLabel="نعم، حفظ"
+        className="space-y-8"
+      >
         {state.error ? (
           <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{state.error}</p>
         ) : null}
@@ -45,7 +52,7 @@ export default function EditCategoryForm({ category }: { category: CategoryRow }
             حفظ التعديلات
           </SubmitButton>
         </div>
-      </form>
+      </ConfirmForm>
     </Card>
   );
 }

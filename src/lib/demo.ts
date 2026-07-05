@@ -1,4 +1,5 @@
 import type {
+  AppSettings,
   CategoryRow,
   DashboardData,
   InvestmentRow,
@@ -17,6 +18,12 @@ export const DEMO_USER = {
   uid: 'demo-admin',
   email: 'admin@tjaraa.demo',
   role: 'admin',
+};
+
+export const demoAppSettings: AppSettings = {
+  appVersion: '1.0.0',
+  supportWhatsapp: '962791234567',
+  chargeRequestNumber: '962791234567',
 };
 
 export const demoCategories: CategoryRow[] = [
@@ -91,11 +98,11 @@ export const demoTransactions: TransactionRow[] = [
 ];
 
 export const demoWithdrawRequests: WithdrawRow[] = [
-  { id: 'w-5001', userId: 'u-1004', amount: 5000, cardHolder: 'Lina Khaled', cardNumber: '4111 1111 1111 1234', swift: 'ARABJOAX', status: 'pending', createdAt: daysAgo(0) },
-  { id: 'w-5002', userId: 'u-1008', amount: 2200, cardHolder: 'Heba Alzoubi', cardNumber: '5500 0000 0000 4321', swift: 'JKBAJOAM', status: 'pending', createdAt: daysAgo(1) },
-  { id: 'w-5003', userId: 'u-1001', amount: 800, cardHolder: 'Ahmad Hashemi', cardNumber: '4012 8888 8888 1881', swift: 'CBJOJOAX', status: 'approved', createdAt: daysAgo(2) },
-  { id: 'w-5004', userId: 'u-1006', amount: 1500, cardHolder: 'Dana Samir', cardNumber: '6011 0009 9013 9424', swift: 'BBOSJOAM', status: 'pending', createdAt: daysAgo(3) },
-  { id: 'w-5005', userId: 'u-1007', amount: 200, cardHolder: 'Omar Fouad', cardNumber: '3530 1113 3330 0000', swift: 'AHLIJOAM', status: 'rejected', createdAt: daysAgo(5) },
+  { id: 'w-5001', userId: 'u-1004', amount: 5000, cardHolder: 'Lina Khaled', cardNumber: '4111 1111 1111 1234', swift: 'ARABJOAX', status: 'pending', adminNote: null, createdAt: daysAgo(0) },
+  { id: 'w-5002', userId: 'u-1008', amount: 2200, cardHolder: 'Heba Alzoubi', cardNumber: '5500 0000 0000 4321', swift: 'JKBAJOAM', status: 'pending', adminNote: null, createdAt: daysAgo(1) },
+  { id: 'w-5003', userId: 'u-1001', amount: 800, cardHolder: 'Ahmad Hashemi', cardNumber: '4012 8888 8888 1881', swift: 'CBJOJOAX', status: 'approved', adminNote: null, createdAt: daysAgo(2) },
+  { id: 'w-5004', userId: 'u-1006', amount: 1500, cardHolder: 'Dana Samir', cardNumber: '6011 0009 9013 9424', swift: 'BBOSJOAM', status: 'pending', adminNote: null, createdAt: daysAgo(3) },
+  { id: 'w-5005', userId: 'u-1007', amount: 200, cardHolder: 'Omar Fouad', cardNumber: '3530 1113 3330 0000', swift: 'AHLIJOAM', status: 'rejected', adminNote: 'بيانات البطاقة غير صحيحة', createdAt: daysAgo(5) },
 ];
 
 export const demoInvestments: InvestmentRow[] = [
