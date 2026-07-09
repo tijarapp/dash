@@ -37,7 +37,7 @@ export default function SettingsForm({ settings }: { settings: AppSettings }) {
           <div>
             <h2 className="font-semibold text-gray-900">إعدادات التطبيق</h2>
             <p className="text-sm text-gray-500">
-              تظهر هذه القيم في تطبيق المستخدم (الإصدار، الدعم، طلبات الشحن)
+              تظهر هذه القيم في تطبيق المستخدم (الإصدار، روابط المتاجر، الدعم، طلبات الشحن)
             </p>
           </div>
         </div>
@@ -71,6 +71,41 @@ export default function SettingsForm({ settings }: { settings: AppSettings }) {
                   defaultValue={settings.appVersion}
                   placeholder="1.0.0"
                   className={inputClass}
+                />
+              </FormField>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              روابط المتاجر
+            </h3>
+            <div className="space-y-4">
+              <FormField
+                label="رابط تطبيق iOS (App Store)"
+                hint="رابط التطبيق على Apple App Store"
+              >
+                <input
+                  name="iosAppUrl"
+                  type="url"
+                  defaultValue={settings.iosAppUrl}
+                  placeholder="https://apps.apple.com/app/id..."
+                  className={`${inputClass} font-mono`}
+                  dir="ltr"
+                />
+              </FormField>
+
+              <FormField
+                label="رابط تطبيق Google Play"
+                hint="رابط التطبيق على متجر Google Play"
+              >
+                <input
+                  name="googlePlayAppUrl"
+                  type="url"
+                  defaultValue={settings.googlePlayAppUrl}
+                  placeholder="https://play.google.com/store/apps/details?id=..."
+                  className={`${inputClass} font-mono`}
+                  dir="ltr"
                 />
               </FormField>
             </div>

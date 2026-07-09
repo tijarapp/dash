@@ -15,6 +15,8 @@ export interface AppSettings {
   appVersion: string;
   supportWhatsapp: string;
   chargeRequestNumber: string;
+  iosAppUrl: string;
+  googlePlayAppUrl: string;
 }
 
 export interface CategoryRow {
@@ -281,6 +283,8 @@ export async function getAppSettings(): Promise<AppSettings> {
       appVersion: '',
       supportWhatsapp: '',
       chargeRequestNumber: '',
+      iosAppUrl: '',
+      googlePlayAppUrl: '',
     };
   }
 
@@ -289,6 +293,8 @@ export async function getAppSettings(): Promise<AppSettings> {
     appVersion: String(d.appVersion ?? ''),
     supportWhatsapp: String(d.supportWhatsapp ?? ''),
     chargeRequestNumber: String(d.chargeRequestNumber ?? ''),
+    iosAppUrl: String(d.iosAppUrl ?? ''),
+    googlePlayAppUrl: String(d.googlePlayAppUrl ?? ''),
   };
 }
 

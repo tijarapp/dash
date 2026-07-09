@@ -567,10 +567,18 @@ export async function updateAppSettings(
     const appVersion = String(formData.get('appVersion') ?? '').trim();
     const supportWhatsapp = String(formData.get('supportWhatsapp') ?? '').trim();
     const chargeRequestNumber = String(formData.get('chargeRequestNumber') ?? '').trim();
+    const iosAppUrl = String(formData.get('iosAppUrl') ?? '').trim();
+    const googlePlayAppUrl = String(formData.get('googlePlayAppUrl') ?? '').trim();
 
     if (!appVersion) return { error: 'أدخل إصدار التطبيق' };
     if (!supportWhatsapp) return { error: 'أدخل رقم واتساب الدعم' };
     if (!chargeRequestNumber) return { error: 'أدخل رقم طلبات الشحن' };
+    if (iosAppUrl && !/^https?:\/\//i.test(iosAppUrl)) {
+      return { error: 'رابط تطبيق iOS يجب أن يبدأ بـ http:// أو https://' };
+    }
+    if (googlePlayAppUrl && !/^https?:\/\//i.test(googlePlayAppUrl)) {
+      return { error: 'رابط تطبيق Google Play يجب أن يبدأ بـ http:// أو https://' };
+    }
 
     if (DEMO_MODE) {
       revalidatePath('/settings');
@@ -582,6 +590,8 @@ export async function updateAppSettings(
         appVersion,
         supportWhatsapp,
         chargeRequestNumber,
+        iosAppUrl,
+        googlePlayAppUrl,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },

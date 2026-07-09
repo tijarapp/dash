@@ -24,6 +24,8 @@ export const demoAppSettings: AppSettings = {
   appVersion: '1.0.0',
   supportWhatsapp: '962791234567',
   chargeRequestNumber: '962791234567',
+  iosAppUrl: 'https://apps.apple.com/app/id000000000',
+  googlePlayAppUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
 };
 
 export const demoCategories: CategoryRow[] = [

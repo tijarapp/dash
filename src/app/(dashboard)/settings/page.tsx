@@ -11,7 +11,7 @@ export default async function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="الإعدادات"
-        description="إدارة إصدار التطبيق وأرقام الدعم وطلبات الشحن"
+        description="إدارة إصدار التطبيق وروابط المتاجر وأرقام الدعم وطلبات الشحن"
       />
       <SettingsForm settings={settings} />
     </div>
