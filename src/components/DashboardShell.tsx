@@ -17,10 +17,10 @@ export default function DashboardShell({
 
   return (
     <NavigationProvider>
-      <div className="flex min-h-screen overflow-x-hidden">
+      <div className="flex h-screen overflow-hidden">
         <Sidebar email={email} open={sidebarOpen} onClose={closeSidebar} />
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
             <button
               type="button"
