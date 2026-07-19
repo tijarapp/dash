@@ -26,7 +26,7 @@ function loginErrorMessage(err: unknown): string {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState(DEMO_MODE ? 'admin@tjaraa.demo' : '');
+  const [email, setEmail] = useState(DEMO_MODE ? 'admin@dar-alasas.demo' : '');
   const [password, setPassword] = useState(DEMO_MODE ? 'demo1234' : '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -71,9 +71,9 @@ export default function LoginPage() {
       >
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-lg font-bold text-white">
-            GD
+            دا
           </div>
-          <h1 className="text-xl font-bold">لوحة تحكم تجارة تيك</h1>
+          <h1 className="text-xl font-bold">لوحة تحكم دار الأساس</h1>
           <p className="text-sm text-gray-500">تسجيل دخول المشرف</p>
         </div>
         {DEMO_MODE && (

@@ -32,9 +32,9 @@ export default function DashboardShell({
             </button>
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-gold text-xs font-bold text-brand-navy">
-                GD
+                دا
               </span>
-              <span className="text-sm font-bold text-brand-navy">تجارة تيك</span>
+              <span className="text-sm font-bold text-brand-navy">دار الأساس</span>
             </div>
           </header>
 

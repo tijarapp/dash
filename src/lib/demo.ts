@@ -16,14 +16,14 @@ export const DEMO_SESSION_VALUE = 'demo-session';
 
 export const DEMO_USER = {
   uid: 'demo-admin',
-  email: 'admin@tjaraa.demo',
+  email: 'admin@dar-alasas.demo',
   role: 'admin',
 };
 
 export const demoAppSettings: AppSettings = {
   appVersion: '1.0.0',
   supportWhatsapp: '962791234567',
-  supportTelegram: '@tijaraa_support',
+  supportTelegram: '@dar_alasas_support',
   chargeRequestNumber: '962791234567',
   iosAppUrl: 'https://apps.apple.com/app/id000000000',
   googlePlayAppUrl: 'https://play.google.com/store/apps/details?id=com.example.app',

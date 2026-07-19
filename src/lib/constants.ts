@@ -1,1 +1,1 @@
-export const SESSION_COOKIE = 'tjaraa_admin_session';
+export const SESSION_COOKIE = 'dar_alasas_admin_session';

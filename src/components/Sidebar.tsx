@@ -72,9 +72,9 @@ export default function Sidebar({
         <div className="mb-6 flex items-center justify-between gap-2 px-2">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-gold text-sm font-bold">
-              GD
+              دا
             </span>
-            <span className="font-bold">تجارة تيك</span>
+            <span className="font-bold">دار الأساس</span>
           </div>
           <button
             type="button"

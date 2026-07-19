@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Tjaraa Tech — لوحة التحكم',
-  description: 'لوحة تحكم تطبيق تجارة تيك',
+  title: 'دار الأساس — لوحة التحكم',
+  description: 'لوحة تحكم تطبيق دار الأساس',
 };
 
 export const viewport: Viewport = {
