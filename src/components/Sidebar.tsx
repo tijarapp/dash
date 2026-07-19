@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import BrandLogo from '@/components/BrandLogo';
 import { useNavigation } from '@/components/NavigationProvider';
 
 const links = [
@@ -71,9 +72,7 @@ export default function Sidebar({
       >
         <div className="mb-6 flex items-center justify-between gap-2 px-2">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-gold text-sm font-bold">
-              دا
-            </span>
+            <BrandLogo size={40} className="rounded-xl" />
             <span className="font-bold">دار الأساس</span>
           </div>
           <button

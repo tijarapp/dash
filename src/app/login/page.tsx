@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import BrandLogo from '@/components/BrandLogo';
 import { clientAuth } from '@/lib/firebaseClient';
 import { DEMO_MODE } from '@/lib/demo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -70,8 +71,8 @@ export default function LoginPage() {
         className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-5 shadow-sm sm:p-8"
       >
         <div className="text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-lg font-bold text-white">
-            دا
+          <div className="mx-auto mb-4 h-20 w-20 overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/10">
+            <BrandLogo size={80} className="h-full w-full" />
           </div>
           <h1 className="text-xl font-bold">لوحة تحكم دار الأساس</h1>
           <p className="text-sm text-gray-500">تسجيل دخول المشرف</p>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, type ReactNode } from 'react';
+import BrandLogo from '@/components/BrandLogo';
 import NavigationLoader from '@/components/NavigationLoader';
 import { NavigationProvider } from '@/components/NavigationProvider';
 import Sidebar from '@/components/Sidebar';
@@ -31,9 +32,7 @@ export default function DashboardShell({
               ☰ القائمة
             </button>
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-gold text-xs font-bold text-brand-navy">
-                دا
-              </span>
+              <BrandLogo size={32} className="rounded-lg" />
               <span className="text-sm font-bold text-brand-navy">دار الأساس</span>
             </div>
           </header>

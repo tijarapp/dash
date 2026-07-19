@@ -4,6 +4,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'دار الأساس — لوحة التحكم',
   description: 'لوحة تحكم تطبيق دار الأساس',
+  icons: {
+    icon: [{ url: '/logo.png', type: 'image/png' }],
+    apple: [{ url: '/logo.png', type: 'image/png' }],
+  },
 };
 
 export const viewport: Viewport = {
