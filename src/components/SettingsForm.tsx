@@ -132,6 +132,19 @@ export default function SettingsForm({ settings }: { settings: AppSettings }) {
               </FormField>
 
               <FormField
+                label="تيليجرام الدعم"
+                hint="اسم المستخدم مثل @username أو رابط https://t.me/username"
+              >
+                <input
+                  name="supportTelegram"
+                  defaultValue={settings.supportTelegram}
+                  placeholder="@username"
+                  className={`${inputClass} font-mono`}
+                  dir="ltr"
+                />
+              </FormField>
+
+              <FormField
                 label="رقم طلبات الشحن"
                 hint="الرقم الذي يتواصل معه المستخدم لطلب شحن الرصيد"
               >

@@ -14,6 +14,7 @@ import {
 export interface AppSettings {
   appVersion: string;
   supportWhatsapp: string;
+  supportTelegram: string;
   chargeRequestNumber: string;
   iosAppUrl: string;
   googlePlayAppUrl: string;
@@ -282,6 +283,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     return {
       appVersion: '',
       supportWhatsapp: '',
+      supportTelegram: '',
       chargeRequestNumber: '',
       iosAppUrl: '',
       googlePlayAppUrl: '',
@@ -292,6 +294,7 @@ export async function getAppSettings(): Promise<AppSettings> {
   return {
     appVersion: String(d.appVersion ?? ''),
     supportWhatsapp: String(d.supportWhatsapp ?? ''),
+    supportTelegram: String(d.supportTelegram ?? ''),
     chargeRequestNumber: String(d.chargeRequestNumber ?? ''),
     iosAppUrl: String(d.iosAppUrl ?? ''),
     googlePlayAppUrl: String(d.googlePlayAppUrl ?? ''),

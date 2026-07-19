@@ -13,6 +13,12 @@ import {
 
 export type FormActionState = { error: string | null };
 
+function isValidTelegramSupport(value: string): boolean {
+  if (/^https?:\/\/(t\.me|telegram\.me)\/[\w]+$/i.test(value)) return true;
+  const username = value.startsWith('@') ? value.slice(1) : value;
+  return /^[a-zA-Z][\w]{4,31}$/.test(username);
+}
+
 function categoryFinancialFields(formData: FormData) {
   const dailyProfitRate = Number(formData.get('dailyProfitRate') ?? 0);
   const rateError = validateDailyProfitRate(dailyProfitRate);
@@ -566,6 +572,7 @@ export async function updateAppSettings(
 
     const appVersion = String(formData.get('appVersion') ?? '').trim();
     const supportWhatsapp = String(formData.get('supportWhatsapp') ?? '').trim();
+    const supportTelegram = String(formData.get('supportTelegram') ?? '').trim();
     const chargeRequestNumber = String(formData.get('chargeRequestNumber') ?? '').trim();
     const iosAppUrl = String(formData.get('iosAppUrl') ?? '').trim();
     const googlePlayAppUrl = String(formData.get('googlePlayAppUrl') ?? '').trim();
@@ -579,6 +586,9 @@ export async function updateAppSettings(
     if (googlePlayAppUrl && !/^https?:\/\//i.test(googlePlayAppUrl)) {
       return { error: 'رابط تطبيق Google Play يجب أن يبدأ بـ http:// أو https://' };
     }
+    if (supportTelegram && !isValidTelegramSupport(supportTelegram)) {
+      return { error: 'أدخل اسم مستخدم تيليجرام صحيحاً (مثل @username) أو رابط t.me' };
+    }
 
     if (DEMO_MODE) {
       revalidatePath('/settings');
@@ -589,6 +599,7 @@ export async function updateAppSettings(
       {
         appVersion,
         supportWhatsapp,
+        supportTelegram,
         chargeRequestNumber,
         iosAppUrl,
         googlePlayAppUrl,
