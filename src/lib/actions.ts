@@ -69,11 +69,14 @@ export async function updateCategory(
     const id = String(formData.get('id') ?? '');
     if (!id) return { error: 'معرّف الفئة غير موجود' };
 
+    const financial = categoryFinancialFields(formData);
+    const title = String(formData.get('title') ?? '');
+    const imageUrl = String(formData.get('imageUrl') ?? '');
     const data = {
-      title: String(formData.get('title') ?? ''),
+      title,
       description: String(formData.get('description') ?? ''),
-      imageUrl: String(formData.get('imageUrl') ?? ''),
-      ...categoryFinancialFields(formData),
+      imageUrl,
+      ...financial,
       isActive: formData.get('isActive') === 'true',
       annualYield: FieldValue.delete(),
     };
@@ -85,8 +88,36 @@ export async function updateCategory(
     }
 
     await adminDb.collection('investmentCategories').doc(id).update(data);
+
+    // Subscriptions denormalize category display fields at subscribe time.
+    // Keep those snapshots in sync so mobile users see admin edits.
+    const investmentsSnap = await adminDb
+      .collection('investments')
+      .where('categoryId', '==', id)
+      .get();
+
+    if (!investmentsSnap.empty) {
+      const snapshotFields = {
+        categoryTitle: title,
+        categoryImageUrl: imageUrl,
+        dailyProfitRate: financial.dailyProfitRate,
+      };
+      let batch = adminDb.batch();
+      let count = 0;
+      for (const doc of investmentsSnap.docs) {
+        batch.update(doc.ref, snapshotFields);
+        count += 1;
+        if (count % 400 === 0) {
+          await batch.commit();
+          batch = adminDb.batch();
+        }
+      }
+      if (count % 400 !== 0) await batch.commit();
+    }
+
     revalidatePath('/categories');
     revalidatePath(`/categories/${id}/edit`);
+    revalidatePath('/');
     return { error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'فشل حفظ الفئة';
