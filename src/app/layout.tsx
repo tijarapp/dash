@@ -5,8 +5,12 @@ export const metadata: Metadata = {
   title: 'دار الأساس — لوحة التحكم',
   description: 'لوحة تحكم تطبيق دار الأساس',
   icons: {
-    icon: [{ url: '/logo.png', type: 'image/png' }],
-    apple: [{ url: '/logo.png', type: 'image/png' }],
+    icon: [
+      { url: '/favicon-32.png?v=2', type: 'image/png', sizes: '32x32' },
+      { url: '/logo.png?v=2', type: 'image/png', sizes: '512x512' },
+    ],
+    shortcut: '/favicon-32.png?v=2',
+    apple: '/logo.png?v=2',
   },
 };
 
