@@ -4,6 +4,7 @@ import { useState } from 'react';
 import NavAnchor from '@/components/NavAnchor';
 import { updateWithdrawRequest } from '@/lib/actions';
 import type { WithdrawRow } from '@/lib/data';
+import { withdrawMethodLabel } from '@/lib/withdraw';
 import Card from '@/components/ui/Card';
 import ConfirmForm from '@/components/ui/ConfirmForm';
 import FormField, { inputClass } from '@/components/ui/FormField';
@@ -18,6 +19,7 @@ export default function EditWithdrawForm({
   userName: string;
 }) {
   const [status, setStatus] = useState(request.status);
+  const isZainCash = request.method === 'zaincash';
   const willReject =
     status === 'rejected' &&
     (request.status === 'pending' || request.status === 'approved');
@@ -31,7 +33,8 @@ export default function EditWithdrawForm({
         <div>
           <h2 className="font-semibold text-gray-900">تعديل طلب السحب</h2>
           <p className="text-sm text-gray-500">
-            المستخدم: {userName} — المبلغ الحالي: {request.amount.toLocaleString()} دينار
+            المستخدم: {userName} — المبلغ الحالي: {request.amount.toLocaleString()} دينار —{' '}
+            {withdrawMethodLabel(request.method)}
           </p>
         </div>
       </div>
@@ -51,7 +54,9 @@ export default function EditWithdrawForm({
             ? {
                 name: 'adminNote',
                 label: 'سبب الرفض للمستخدم',
-                placeholder: 'مثال: بيانات البطاقة غير صحيحة',
+                placeholder: isZainCash
+                  ? 'مثال: رقم المحفظة غير صحيح'
+                  : 'مثال: بيانات البطاقة غير صحيحة',
                 required: true,
               }
             : undefined
@@ -60,6 +65,7 @@ export default function EditWithdrawForm({
       >
         <FormPendingOverlay message="جاري حفظ التعديلات..." />
         <input type="hidden" name="id" value={request.id} />
+        <input type="hidden" name="method" value={request.method} />
 
         <section>
           <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -84,6 +90,11 @@ export default function EditWithdrawForm({
                 className={inputClass}
               />
             </FormField>
+            <FormField label="طريقة السحب">
+              <div className={`${inputClass} bg-gray-100 text-gray-700`}>
+                {withdrawMethodLabel(request.method)}
+              </div>
+            </FormField>
             <FormField label="الحالة">
               <select
                 name="status"
@@ -101,36 +112,59 @@ export default function EditWithdrawForm({
 
         <section>
           <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            بيانات البطاقة البنكية
+            {isZainCash ? 'بيانات زين كاش' : 'بيانات البطاقة البنكية'}
           </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="صاحب البطاقة" className="sm:col-span-2">
-              <input
-                name="cardHolder"
-                required
-                defaultValue={request.cardHolder}
-                placeholder="الاسم كما يظهر على البطاقة"
-                className={inputClass}
-              />
-            </FormField>
-            <FormField label="رقم البطاقة" className="sm:col-span-2">
-              <input
-                name="cardNumber"
-                required
-                defaultValue={request.cardNumber}
-                placeholder="رقم البطاقة أو IBAN"
-                className={`${inputClass} font-mono`}
-              />
-            </FormField>
-            <FormField label="رمز SWIFT" className="sm:col-span-2">
-              <input
-                name="swift"
-                defaultValue={request.swift}
-                placeholder="مثال: ARABJOAX"
-                className={`${inputClass} font-mono`}
-              />
-            </FormField>
-          </div>
+          {isZainCash ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="صاحب المحفظة" className="sm:col-span-2">
+                <input
+                  name="holderName"
+                  required
+                  defaultValue={request.holderName}
+                  placeholder="الاسم كما هو مسجل في زين كاش"
+                  className={inputClass}
+                />
+              </FormField>
+              <FormField label="رقم المحفظة" className="sm:col-span-2">
+                <input
+                  name="phoneNumber"
+                  required
+                  defaultValue={request.phoneNumber}
+                  placeholder="07XXXXXXXXX"
+                  className={`${inputClass} font-mono`}
+                />
+              </FormField>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="صاحب البطاقة" className="sm:col-span-2">
+                <input
+                  name="cardHolder"
+                  required
+                  defaultValue={request.cardHolder}
+                  placeholder="الاسم كما يظهر على البطاقة"
+                  className={inputClass}
+                />
+              </FormField>
+              <FormField label="رقم البطاقة" className="sm:col-span-2">
+                <input
+                  name="cardNumber"
+                  required
+                  defaultValue={request.cardNumber}
+                  placeholder="رقم البطاقة أو IBAN"
+                  className={`${inputClass} font-mono`}
+                />
+              </FormField>
+              <FormField label="رمز SWIFT" className="sm:col-span-2">
+                <input
+                  name="swift"
+                  defaultValue={request.swift}
+                  placeholder="مثال: ARABJOAX"
+                  className={`${inputClass} font-mono`}
+                />
+              </FormField>
+            </div>
+          )}
         </section>
 
         {request.adminNote ? (

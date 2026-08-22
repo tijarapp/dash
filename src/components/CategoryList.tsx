@@ -4,6 +4,7 @@ import Image from 'next/image';
 import NavAnchor from '@/components/NavAnchor';
 import CategoryCardActions from '@/components/CategoryCardActions';
 import type { CategoryRow } from '@/lib/data';
+import { formatCategoryDuration } from '@/lib/categoryProfit';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
@@ -61,14 +62,16 @@ export default function CategoryList({ categories }: { categories: CategoryRow[]
                     </p>
                   </div>
                   <div className="rounded-lg bg-gray-50 px-2 py-2 sm:px-3">
-                    <p className="text-[11px] text-gray-400 sm:text-xs">الحد الأدنى</p>
+                    <p className="text-[11px] text-gray-400 sm:text-xs">السعر</p>
                     <p className="mt-0.5 text-sm font-semibold">
                       {c.minInvestment.toLocaleString()}
                     </p>
                   </div>
                   <div className="rounded-lg bg-gray-50 px-2 py-2 sm:px-3">
                     <p className="text-[11px] text-gray-400 sm:text-xs">المدة</p>
-                    <p className="mt-0.5 text-sm font-semibold">سنة واحدة</p>
+                    <p className="mt-0.5 text-sm font-semibold">
+                      {formatCategoryDuration(c.durationMonths)}
+                    </p>
                   </div>
                 </div>
 

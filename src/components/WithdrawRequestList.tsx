@@ -1,7 +1,9 @@
 'use client';
 
 import NavAnchor from '@/components/NavAnchor';
+import WithdrawDetailsGrid from '@/components/WithdrawDetailsGrid';
 import type { WithdrawRow } from '@/lib/data';
+import { withdrawMethodLabel } from '@/lib/withdraw';
 import { WithdrawApproveReject } from '@/components/WithdrawApproveReject';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
@@ -46,6 +48,9 @@ function WithdrawCard({
                 {userName}
               </NavAnchor>
               <Badge status={request.status} />
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              {withdrawMethodLabel(request.method)}
+            </span>
             </div>
             <p className="mt-1 text-lg font-bold text-red-600">
               {request.amount.toLocaleString()}{' '}
@@ -63,24 +68,12 @@ function WithdrawCard({
               {userName}
             </NavAnchor>
             <Badge status={request.status} />
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              {withdrawMethodLabel(request.method)}
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded-lg bg-gray-50 px-3 py-2">
-              <p className="text-xs text-gray-400">صاحب البطاقة</p>
-              <p className="font-medium">{request.cardHolder || '—'}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 px-3 py-2">
-              <p className="text-xs text-gray-400">رقم البطاقة</p>
-              <p className="break-all font-mono text-sm">{request.cardNumber || '—'}</p>
-            </div>
-            {request.swift ? (
-              <div className="rounded-lg bg-gray-50 px-3 py-2 sm:col-span-2">
-                <p className="text-xs text-gray-400">SWIFT</p>
-                <p className="break-all font-mono text-sm">{request.swift}</p>
-              </div>
-            ) : null}
-          </div>
+          <WithdrawDetailsGrid request={request} />
 
           <p className="mt-2 text-xs text-gray-400">{formatDate(request.createdAt)}</p>
 

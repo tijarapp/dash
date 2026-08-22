@@ -1,6 +1,7 @@
 'use client';
 
 import type { InvestmentRow, TransactionRow, WithdrawRow } from '@/lib/data';
+import { withdrawAccountLabel, withdrawMethodLabel } from '@/lib/withdraw';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
@@ -79,7 +80,8 @@ function WithdrawList({ withdrawRequests }: { withdrawRequests: WithdrawRow[] })
         {pageItems.map((w) => (
           <div key={w.id} className="flex items-center justify-between gap-3 p-4">
             <div className="min-w-0">
-              <p className="font-medium text-gray-900">{w.cardHolder}</p>
+              <p className="font-medium text-gray-900">{withdrawAccountLabel(w)}</p>
+              <p className="text-xs text-gray-500">{withdrawMethodLabel(w.method)}</p>
               <p className="text-xs text-gray-400">{formatDate(w.createdAt)}</p>
               {w.adminNote ? (
                 <p className="mt-1 text-xs text-red-600">سبب الرفض: {w.adminNote}</p>

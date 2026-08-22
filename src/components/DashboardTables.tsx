@@ -9,6 +9,7 @@ import type {
   UserRow,
   WithdrawRow,
 } from '@/lib/data';
+import { withdrawAccountLabel, withdrawMethodLabel } from '@/lib/withdraw';
 import Pagination from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 
@@ -110,7 +111,7 @@ export default function DashboardTables({
   return (
     <div className="space-y-8">
       <section>
-        <SectionTitle title="المستثمرون" href="/investors" linkLabel="عرض الكل ←" />
+        <SectionTitle title="المستثمرون" href="/users?tab=investors" linkLabel="عرض الكل ←" />
         <div className="space-y-3 md:hidden">
           {investorsPage.pageItems.map((inv) => (
             <NavAnchor key={inv.id} href={`/users/${inv.id}`} className="block">
@@ -478,7 +479,8 @@ export default function DashboardTables({
                 <tr>
                   <th className="p-3">المستثمر</th>
                   <th className="p-3">المبلغ</th>
-                  <th className="p-3">صاحب البطاقة</th>
+                  <th className="p-3">الطريقة</th>
+                  <th className="p-3">المستلم</th>
                   <th className="p-3">التاريخ</th>
                   <th className="p-3">الحالة</th>
                 </tr>
@@ -490,7 +492,8 @@ export default function DashboardTables({
                     <td className="p-3 font-medium text-red-600">
                       {w.amount.toLocaleString()}
                     </td>
-                    <td className="p-3">{w.cardHolder}</td>
+                    <td className="p-3">{withdrawMethodLabel(w.method)}</td>
+                    <td className="p-3">{withdrawAccountLabel(w)}</td>
                     <td className="p-3">{formatDate(w.createdAt)}</td>
                     <td className="p-3">
                       <StatusBadge status={w.status} />

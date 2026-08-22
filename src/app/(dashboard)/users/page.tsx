@@ -1,28 +1,23 @@
-import NavAnchor from '@/components/NavAnchor';
-import UserList from '@/components/UserList';
+import { Suspense } from 'react';
+import PeopleDirectory from '@/components/PeopleDirectory';
 import PageHeader from '@/components/ui/PageHeader';
-import { listRegularUsers } from '@/lib/data';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { listInvestors, listRegularUsers } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 
 export default async function UsersPage() {
-  const users = await listRegularUsers();
+  const [users, investors] = await Promise.all([listRegularUsers(), listInvestors()]);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="المستخدمون"
-        description="المستخدمون المسجلون بدون استثمارات — اضغط على أي مستخدم لعرض التفاصيل"
-        action={
-          <NavAnchor
-            href="/investors"
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-          >
-            عرض المستثمرين
-          </NavAnchor>
-        }
+        title="المستخدمون والمستثمرون"
+        description="تصفّح المستخدمين والمستثمرين وابحث بالاسم أو الهاتف أو كود الإحالة"
       />
-      <UserList users={users} />
+      <Suspense fallback={<LoadingSpinner />}>
+        <PeopleDirectory users={users} investors={investors} />
+      </Suspense>
     </div>
   );
 }

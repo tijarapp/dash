@@ -37,7 +37,7 @@ export default function DailyProfitSlider({
 
         <FormField label="مدة الاستثمار" hint="ثابتة لجميع الفئات">
           <div className={`${inputClass} flex items-center bg-gray-100 text-gray-700`}>
-            سنة واحدة ({CATEGORY_DURATION_MONTHS} شهراً)
+            سنتان ({CATEGORY_DURATION_MONTHS} شهراً)
           </div>
         </FormField>
       </div>

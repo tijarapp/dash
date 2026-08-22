@@ -51,14 +51,18 @@ export default function CategoryFormFields({
         </h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <DailyProfitSlider defaultValue={category?.dailyProfitRate} />
-          <FormField label="الحد الأدنى للاستثمار" hint="بالدينار أو الذهب">
+          <FormField
+            label="سعر الاستثمار"
+            hint="المبلغ الثابت الذي يدفعه كل مشترك (دينار أو ذهب)"
+          >
             <input
               name="minInvestment"
               type="number"
-              min="0"
+              min="1"
+              step="1"
               required
               defaultValue={category?.minInvestment}
-              placeholder="500"
+              placeholder="25000"
               className={inputClass}
             />
           </FormField>

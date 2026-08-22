@@ -51,13 +51,19 @@ function UserRowCard({ user }: { user: UserRow }) {
   );
 }
 
-export default function UserList({ users }: { users: UserRow[] }) {
+export default function UserList({
+  users,
+  emptyMessage = 'لا يوجد مستخدمون مسجلون بدون استثمارات',
+}: {
+  users: UserRow[];
+  emptyMessage?: string;
+}) {
   const { pageItems, page, setPage, totalPages, totalItems, from, to } = usePagination(users);
 
   if (users.length === 0) {
     return (
       <Card>
-        <EmptyState message="لا يوجد مستخدمون مسجلون بدون استثمارات" />
+        <EmptyState message={emptyMessage} />
       </Card>
     );
   }

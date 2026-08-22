@@ -26,7 +26,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="space-y-6">
       <NavAnchor
-        href={isInvestor ? '/investors' : '/users'}
+        href={isInvestor ? '/users?tab=investors' : '/users'}
         className="inline-flex items-center gap-1 text-sm text-gray-500 transition hover:text-brand-blue"
       >
         → رجوع

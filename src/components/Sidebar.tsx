@@ -7,7 +7,6 @@ import { useNavigation } from '@/components/NavigationProvider';
 const links = [
   { href: '/', label: 'نظرة عامة' },
   { href: '/categories', label: 'فئات الاستثمار' },
-  { href: '/investors', label: 'المستثمرون' },
   { href: '/users', label: 'المستخدمون' },
   { href: '/charge', label: 'شحن الرصيد' },
   { href: '/requests', label: 'طلبات السحب' },

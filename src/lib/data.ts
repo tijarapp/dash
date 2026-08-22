@@ -1,5 +1,6 @@
 import { adminDb } from './firebaseAdmin';
 import { CATEGORY_DURATION_MONTHS } from './categoryProfit';
+import { mapWithdrawDoc } from './withdraw';
 import {
   DEMO_MODE,
   demoAppSettings,
@@ -56,9 +57,12 @@ export interface WithdrawRow {
   id: string;
   userId: string;
   amount: number;
+  method: 'mastercard' | 'zaincash';
   cardHolder: string;
   cardNumber: string;
   swift: string;
+  holderName: string;
+  phoneNumber: string;
   status: string;
   adminNote: string | null;
   createdAt: string | null;
@@ -152,8 +156,31 @@ export async function getOverviewStats() {
   };
 }
 
+async function migrateCategoryDurations(): Promise<void> {
+  const snap = await adminDb.collection('investmentCategories').get();
+  let batch = adminDb.batch();
+  let pending = 0;
+
+  for (const doc of snap.docs) {
+    const durationMonths = Number(doc.data().durationMonths);
+    if (durationMonths === CATEGORY_DURATION_MONTHS) continue;
+
+    batch.update(doc.ref, { durationMonths: CATEGORY_DURATION_MONTHS });
+    pending += 1;
+
+    if (pending % 400 === 0) {
+      await batch.commit();
+      batch = adminDb.batch();
+    }
+  }
+
+  if (pending % 400 !== 0) await batch.commit();
+}
+
 export async function listCategories(): Promise<CategoryRow[]> {
   if (DEMO_MODE) return demoCategories;
+
+  await migrateCategoryDurations();
 
   const snap = await adminDb.collection('investmentCategories').get();
   return snap.docs.map((doc) => {
@@ -192,7 +219,7 @@ export async function getCategoryById(id: string): Promise<CategoryRow | null> {
 export async function listUsers(): Promise<UserRow[]> {
   if (DEMO_MODE) return demoUsers;
 
-  const snap = await adminDb.collection('users').limit(200).get();
+  const snap = await adminDb.collection('users').get();
   return snap.docs.map((doc) => {
     const d = doc.data();
     return {
@@ -241,14 +268,7 @@ export async function listWithdrawRequests(): Promise<WithdrawRow[]> {
   return snap.docs.map((doc) => {
     const d = doc.data();
     return {
-      id: doc.id,
-      userId: d.userId ?? '',
-      amount: Number(d.amount) || 0,
-      cardHolder: d.cardHolder ?? '',
-      cardNumber: d.cardNumber ?? '',
-      swift: d.swift ?? '',
-      status: d.status ?? 'pending',
-      adminNote: d.adminNote ?? null,
+      ...mapWithdrawDoc(doc.id, d),
       createdAt: isoFrom(d.createdAt),
     };
   });
@@ -261,14 +281,7 @@ export async function getWithdrawRequestById(id: string): Promise<WithdrawRow | 
   if (!snap.exists) return null;
   const d = snap.data()!;
   return {
-    id: snap.id,
-    userId: d.userId ?? '',
-    amount: Number(d.amount) || 0,
-    cardHolder: d.cardHolder ?? '',
-    cardNumber: d.cardNumber ?? '',
-    swift: d.swift ?? '',
-    status: d.status ?? 'pending',
-    adminNote: d.adminNote ?? null,
+    ...mapWithdrawDoc(snap.id, d),
     createdAt: isoFrom(d.createdAt),
   };
 }
@@ -305,7 +318,7 @@ export async function listInvestments(): Promise<InvestmentRow[]> {
   if (DEMO_MODE) return demoDashboardData().investments;
 
   const [investmentsSnap, categories] = await Promise.all([
-    adminDb.collection('investments').limit(200).get(),
+    adminDb.collection('investments').get(),
     listCategories(),
   ]);
 

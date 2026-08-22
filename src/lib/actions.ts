@@ -9,7 +9,9 @@ import { DEMO_MODE } from './demo';
 import {
   CATEGORY_DURATION_MONTHS,
   validateDailyProfitRate,
+  validateInvestmentPrice,
 } from './categoryProfit';
+import { parseWithdrawMethod } from './withdraw';
 
 export type FormActionState = { error: string | null };
 
@@ -24,9 +26,13 @@ function categoryFinancialFields(formData: FormData) {
   const rateError = validateDailyProfitRate(dailyProfitRate);
   if (rateError) throw new Error(rateError);
 
+  const minInvestment = Number(formData.get('minInvestment') ?? 0);
+  const priceError = validateInvestmentPrice(minInvestment);
+  if (priceError) throw new Error(priceError);
+
   return {
     dailyProfitRate,
-    minInvestment: Number(formData.get('minInvestment') ?? 0),
+    minInvestment,
     durationMonths: CATEGORY_DURATION_MONTHS,
   };
 }
@@ -203,7 +209,6 @@ export async function chargeUserBalance(
 
     revalidatePath('/charge');
     revalidatePath('/users');
-    revalidatePath('/investors');
     revalidatePath('/transactions');
     revalidatePath('/notifications');
     revalidatePath(`/users/${userId}`);
@@ -321,6 +326,32 @@ export async function approveWithdraw(id: string) {
   if (userId) revalidatePath(`/users/${userId}`);
 }
 
+function withdrawPayoutFields(formData: FormData) {
+  const method = parseWithdrawMethod(formData.get('method'));
+  const cardHolder = String(formData.get('cardHolder') ?? '').trim();
+  const cardNumber = String(formData.get('cardNumber') ?? '').trim();
+  const swift = String(formData.get('swift') ?? '').trim();
+  const holderName = String(formData.get('holderName') ?? '').trim();
+  const phoneNumber = String(formData.get('phoneNumber') ?? '').trim();
+
+  if (method === 'zaincash') {
+    if (!holderName || !phoneNumber) {
+      throw new Error('أكمل بيانات زين كاش: اسم صاحب المحفظة ورقم المحفظة');
+    }
+  } else if (!cardHolder || !cardNumber) {
+    throw new Error('أكمل بيانات البطاقة: صاحب البطاقة ورقم البطاقة');
+  }
+
+  return {
+    method,
+    cardHolder,
+    cardNumber,
+    swift,
+    holderName,
+    phoneNumber,
+  };
+}
+
 export async function updateWithdrawRequest(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get('id') ?? '');
@@ -328,9 +359,7 @@ export async function updateWithdrawRequest(formData: FormData) {
 
   const userId = String(formData.get('userId') ?? '');
   const amount = Number(formData.get('amount') ?? 0);
-  const cardHolder = String(formData.get('cardHolder') ?? '');
-  const cardNumber = String(formData.get('cardNumber') ?? '');
-  const swift = String(formData.get('swift') ?? '');
+  const payout = withdrawPayoutFields(formData);
   const newStatus = String(formData.get('status') ?? 'pending');
   const adminNote = String(formData.get('adminNote') ?? '').trim();
 
@@ -362,9 +391,7 @@ export async function updateWithdrawRequest(formData: FormData) {
       txn.update(reqRef, {
         userId,
         amount,
-        cardHolder,
-        cardNumber,
-        swift,
+        ...payout,
         status: 'approved',
       });
       for (const ref of pendingTxnRefs) {
@@ -413,9 +440,7 @@ export async function updateWithdrawRequest(formData: FormData) {
       txn.update(reqRef, {
         userId,
         amount,
-        cardHolder,
-        cardNumber,
-        swift,
+        ...payout,
         status: 'rejected',
         adminNote: adminNote || null,
       });
@@ -449,9 +474,7 @@ export async function updateWithdrawRequest(formData: FormData) {
     await reqRef.update({
       userId,
       amount,
-      cardHolder,
-      cardNumber,
-      swift,
+      ...payout,
       status: newStatus,
     });
   }

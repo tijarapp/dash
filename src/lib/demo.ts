@@ -37,7 +37,7 @@ export const demoCategories: CategoryRow[] = [
     imageUrl: '',
     dailyProfitRate: 0.45,
     minInvestment: 500,
-    durationMonths: 12,
+    durationMonths: 24,
     isActive: true,
   },
   {
@@ -47,7 +47,7 @@ export const demoCategories: CategoryRow[] = [
     imageUrl: '',
     dailyProfitRate: 0.33,
     minInvestment: 250,
-    durationMonths: 12,
+    durationMonths: 24,
     isActive: true,
   },
   {
@@ -57,7 +57,7 @@ export const demoCategories: CategoryRow[] = [
     imageUrl: '',
     dailyProfitRate: 0.5,
     minInvestment: 2000,
-    durationMonths: 12,
+    durationMonths: 24,
     isActive: true,
   },
   {
@@ -67,7 +67,7 @@ export const demoCategories: CategoryRow[] = [
     imageUrl: '',
     dailyProfitRate: 0.55,
     minInvestment: 5000,
-    durationMonths: 12,
+    durationMonths: 24,
     isActive: false,
   },
 ];
@@ -101,11 +101,11 @@ export const demoTransactions: TransactionRow[] = [
 ];
 
 export const demoWithdrawRequests: WithdrawRow[] = [
-  { id: 'w-5001', userId: 'u-1004', amount: 5000, cardHolder: 'Lina Khaled', cardNumber: '4111 1111 1111 1234', swift: 'ARABJOAX', status: 'pending', adminNote: null, createdAt: daysAgo(0) },
-  { id: 'w-5002', userId: 'u-1008', amount: 2200, cardHolder: 'Heba Alzoubi', cardNumber: '5500 0000 0000 4321', swift: 'JKBAJOAM', status: 'pending', adminNote: null, createdAt: daysAgo(1) },
-  { id: 'w-5003', userId: 'u-1001', amount: 800, cardHolder: 'Ahmad Hashemi', cardNumber: '4012 8888 8888 1881', swift: 'CBJOJOAX', status: 'approved', adminNote: null, createdAt: daysAgo(2) },
-  { id: 'w-5004', userId: 'u-1006', amount: 1500, cardHolder: 'Dana Samir', cardNumber: '6011 0009 9013 9424', swift: 'BBOSJOAM', status: 'pending', adminNote: null, createdAt: daysAgo(3) },
-  { id: 'w-5005', userId: 'u-1007', amount: 200, cardHolder: 'Omar Fouad', cardNumber: '3530 1113 3330 0000', swift: 'AHLIJOAM', status: 'rejected', adminNote: 'بيانات البطاقة غير صحيحة', createdAt: daysAgo(5) },
+  { id: 'w-5001', userId: 'u-1004', amount: 5000, method: 'mastercard', cardHolder: 'Lina Khaled', cardNumber: '4111 1111 1111 1234', swift: 'ARABJOAX', holderName: '', phoneNumber: '', status: 'pending', adminNote: null, createdAt: daysAgo(0) },
+  { id: 'w-5002', userId: 'u-1008', amount: 2200, method: 'zaincash', cardHolder: '', cardNumber: '', swift: '', holderName: 'هبة الزعبي', phoneNumber: '0791234567', status: 'pending', adminNote: null, createdAt: daysAgo(1) },
+  { id: 'w-5003', userId: 'u-1001', amount: 800, method: 'mastercard', cardHolder: 'Ahmad Hashemi', cardNumber: '4012 8888 8888 1881', swift: 'CBJOJOAX', holderName: '', phoneNumber: '', status: 'approved', adminNote: null, createdAt: daysAgo(2) },
+  { id: 'w-5004', userId: 'u-1006', amount: 1500, method: 'zaincash', cardHolder: '', cardNumber: '', swift: '', holderName: 'دانا سمير', phoneNumber: '0787654321', status: 'pending', adminNote: null, createdAt: daysAgo(3) },
+  { id: 'w-5005', userId: 'u-1007', amount: 200, method: 'mastercard', cardHolder: 'Omar Fouad', cardNumber: '3530 1113 3330 0000', swift: 'AHLIJOAM', holderName: '', phoneNumber: '', status: 'rejected', adminNote: 'بيانات البطاقة غير صحيحة', createdAt: daysAgo(5) },
 ];
 
 export const demoInvestments: InvestmentRow[] = [

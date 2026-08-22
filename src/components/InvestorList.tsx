@@ -55,14 +55,20 @@ function InvestorRowCard({ investor }: { investor: InvestorSummary }) {
   );
 }
 
-export default function InvestorList({ investors }: { investors: InvestorSummary[] }) {
+export default function InvestorList({
+  investors,
+  emptyMessage = 'لا يوجد مستثمرون بعد',
+}: {
+  investors: InvestorSummary[];
+  emptyMessage?: string;
+}) {
   const { pageItems, page, setPage, totalPages, totalItems, from, to } =
     usePagination(investors);
 
   if (investors.length === 0) {
     return (
       <Card>
-        <EmptyState message="لا يوجد مستثمرون بعد" />
+        <EmptyState message={emptyMessage} />
       </Card>
     );
   }

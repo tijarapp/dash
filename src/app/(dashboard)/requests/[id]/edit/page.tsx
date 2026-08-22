@@ -23,7 +23,7 @@ export default async function EditWithdrawPage({ params }: { params: Promise<{ i
       </NavAnchor>
       <PageHeader
         title="تعديل طلب السحب"
-        description="عدّل جميع بيانات الطلب — المبلغ، البطاقة، الحالة، والمستخدم"
+        description="عدّل جميع بيانات الطلب — المبلغ، طريقة السحب، الحالة، والمستخدم"
       />
       <EditWithdrawForm request={request} userName={userName} />
     </div>
