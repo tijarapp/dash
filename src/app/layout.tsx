@@ -6,11 +6,11 @@ export const metadata: Metadata = {
   description: 'لوحة تحكم تطبيق دار الأساس',
   icons: {
     icon: [
-      { url: '/favicon-32.png?v=2', type: 'image/png', sizes: '32x32' },
-      { url: '/logo.png?v=2', type: 'image/png', sizes: '512x512' },
+      { url: '/favicon-32.png?v=3', type: 'image/png', sizes: '32x32' },
+      { url: '/app_icon_master_1024.png?v=3', type: 'image/png', sizes: '1024x1024' },
     ],
-    shortcut: '/favicon-32.png?v=2',
-    apple: '/logo.png?v=2',
+    shortcut: '/favicon-32.png?v=3',
+    apple: '/app_icon_master_1024.png?v=3',
   },
 };
 
