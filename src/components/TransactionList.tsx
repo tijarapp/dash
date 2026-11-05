@@ -1,5 +1,7 @@
 'use client';
 
+import { transactionAmount, khairTransactionLabels } from '@/lib/transactionDisplay';
+
 import NavAnchor from '@/components/NavAnchor';
 import type { TransactionRow } from '@/lib/data';
 import Avatar from '@/components/ui/Avatar';
@@ -13,7 +15,9 @@ const typeLabels: Record<string, string> = {
   charge: 'شحن',
   withdraw: 'سحب',
   profit: 'ربح',
+  monthly_payout: 'دفعة شهرية (رأس مال وربح)',
   invest: 'استثمار',
+  ...khairTransactionLabels,
 };
 
 const typeColors: Record<string, string> = {
@@ -35,6 +39,7 @@ function TransactionCard({
   transaction: TransactionRow;
   userName: string;
 }) {
+  const amount = transactionAmount(transaction);
   const typeClass = typeColors[transaction.type] ?? 'bg-gray-100 text-gray-600';
 
   return (
@@ -63,12 +68,12 @@ function TransactionCard({
         </div>
         <div className="shrink-0 text-left">
           <p
-            className={`text-base font-bold sm:text-lg ${transaction.dinarAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+            className={`text-base font-bold sm:text-lg ${amount >= 0 ? 'text-green-600' : 'text-red-600'}`}
           >
-            {transaction.dinarAmount >= 0 ? '+' : ''}
-            {transaction.dinarAmount.toLocaleString()}
+            {amount >= 0 ? '+' : ''}
+            {amount.toLocaleString()}
           </p>
-          <p className="text-xs text-gray-400">دينار</p>
+          <p className="text-xs text-gray-400">{transaction.paymentMethod === 'points' ? 'نقطة خير' : 'دينار'}</p>
         </div>
       </div>
     </Card>

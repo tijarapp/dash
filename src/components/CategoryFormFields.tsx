@@ -1,4 +1,4 @@
-import DailyProfitSlider from '@/components/DailyProfitSlider';
+import MonthlyInvestmentFields from '@/components/MonthlyInvestmentFields';
 import type { CategoryRow } from '@/lib/data';
 import FormField, { inputClass } from '@/components/ui/FormField';
 import ImageUploadField from '@/components/ui/ImageUploadField';
@@ -31,7 +31,7 @@ export default function CategoryFormFields({
               name="description"
               rows={3}
               defaultValue={category?.description}
-              placeholder="استثمار في سبائك الذهب عيار 24 بعوائد يومية ثابتة..."
+              placeholder="وصف النشاط الاستثماري وطريقة توزيع الدفعات الشهرية..."
               className={`${inputClass} resize-none`}
             />
           </FormField>
@@ -49,24 +49,10 @@ export default function CategoryFormFields({
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
           التفاصيل المالية
         </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <DailyProfitSlider defaultValue={category?.dailyProfitRate} />
-          <FormField
-            label="سعر الاستثمار"
-            hint="المبلغ الثابت الذي يدفعه كل مشترك (دينار أو ذهب)"
-          >
-            <input
-              name="minInvestment"
-              type="number"
-              min="1"
-              step="1"
-              required
-              defaultValue={category?.minInvestment}
-              placeholder="25000"
-              className={inputClass}
-            />
-          </FormField>
-        </div>
+        {category && !category.payoutModel && <p className="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-brand-blue">
+          أكمل المبلغ والمدة والربح المتوقع لتفعيل هذه الفئة بنظام الدفعات الشهرية.
+        </p>}
+        <MonthlyInvestmentFields category={category} />
       </section>
 
       {category && (

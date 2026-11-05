@@ -1,5 +1,7 @@
 'use client';
 
+import { transactionAmount, khairTransactionLabels } from '@/lib/transactionDisplay';
+
 import type { InvestmentRow, TransactionRow, WithdrawRow } from '@/lib/data';
 import { withdrawAccountLabel, withdrawMethodLabel } from '@/lib/withdraw';
 import Badge from '@/components/ui/Badge';
@@ -17,7 +19,9 @@ const typeLabels: Record<string, string> = {
   charge: 'شحن',
   withdraw: 'سحب',
   profit: 'ربح',
+  monthly_payout: 'دفعة شهرية (رأس مال وربح)',
   invest: 'استثمار',
+  ...khairTransactionLabels,
 };
 
 function InvestmentList({ investments }: { investments: InvestmentRow[] }) {
@@ -130,10 +134,10 @@ function TransactionHistory({ transactions }: { transactions: TransactionRow[] }
                 {typeLabels[t.type] ?? t.type}
               </span>
               <span
-                className={`font-semibold ${t.dinarAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                className={`font-semibold ${transactionAmount(t) >= 0 ? 'text-green-600' : 'text-red-600'}`}
               >
-                {t.dinarAmount >= 0 ? '+' : ''}
-                {t.dinarAmount.toLocaleString()}
+                {transactionAmount(t) >= 0 ? '+' : ''}
+                {transactionAmount(t).toLocaleString()}{t.paymentMethod === 'points' ? ' نقطة خير' : ''}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -161,10 +165,10 @@ function TransactionHistory({ transactions }: { transactions: TransactionRow[] }
               <tr key={t.id} className="border-t border-gray-100">
                 <td className="p-3">{typeLabels[t.type] ?? t.type}</td>
                 <td
-                  className={`p-3 font-medium ${t.dinarAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                  className={`p-3 font-medium ${transactionAmount(t) >= 0 ? 'text-green-600' : 'text-red-600'}`}
                 >
-                  {t.dinarAmount >= 0 ? '+' : ''}
-                  {t.dinarAmount.toLocaleString()}
+                  {transactionAmount(t) >= 0 ? '+' : ''}
+                  {transactionAmount(t).toLocaleString()}{t.paymentMethod === 'points' ? ' نقطة خير' : ''}
                 </td>
                 <td className="p-3">
                   <Badge status={t.status} />

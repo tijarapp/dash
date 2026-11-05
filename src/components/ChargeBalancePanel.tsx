@@ -9,13 +9,25 @@ import ConfirmForm from '@/components/ui/ConfirmForm';
 import FormField, { inputClass } from '@/components/ui/FormField';
 import SubmitButton from '@/components/ui/SubmitButton';
 
+import { CHARGE_REASONS } from '@/lib/chargeReasons';
+import { phoneSearchPrefixes } from '@/lib/phoneSearch';
+
 const initialState: FormActionState = { error: null };
 
 function matchesQuery(user: UserRow, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return false;
 
+  let phoneMatches = false;
+  try {
+    phoneMatches = phoneSearchPrefixes(query).some((prefix) =>
+      user.phone.startsWith(prefix),
+    );
+  } catch {
+    /* Short text searches still match names and codes. */
+  }
   return (
+    phoneMatches ||
     user.name.toLowerCase().includes(q) ||
     user.phone.toLowerCase().includes(q) ||
     user.referralCode.toLowerCase().includes(q)
@@ -26,6 +38,8 @@ export default function ChargeBalancePanel({ users }: { users: UserRow[] }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<UserRow | null>(null);
   const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('wallet_top_up');
+  const [note, setNote] = useState('');
   const [success, setSuccess] = useState('');
   const [state, formAction] = useActionState(chargeUserBalance, initialState);
   const pendingAmount = useRef(0);
@@ -66,6 +80,8 @@ export default function ChargeBalancePanel({ users }: { users: UserRow[] }) {
   function selectUser(user: UserRow) {
     setSelected(user);
     setQuery('');
+    setReason('wallet_top_up');
+    setNote('');
     setAmount('');
     setSuccess('');
   }
@@ -152,10 +168,17 @@ export default function ChargeBalancePanel({ users }: { users: UserRow[] }) {
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-3 rounded-xl bg-gray-50 p-4">
               <div className="flex items-center gap-3">
-                <Avatar name={selected.name || selected.phone || '?'} size="md" />
+                <Avatar
+                  name={selected.name || selected.phone || '?'}
+                  size="md"
+                />
                 <div>
-                  <p className="font-semibold text-gray-900">{selected.name || '—'}</p>
-                  <p className="text-sm text-gray-500">{selected.phone || '—'}</p>
+                  <p className="font-semibold text-gray-900">
+                    {selected.name || '—'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {selected.phone || '—'}
+                  </p>
                   <p className="font-mono text-xs text-gray-400">
                     كود الإحالة: {selected.referralCode || '—'}
                   </p>
@@ -186,21 +209,28 @@ export default function ChargeBalancePanel({ users }: { users: UserRow[] }) {
             </div>
 
             {state.error ? (
-              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{state.error}</p>
+              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+                {state.error}
+              </p>
             ) : null}
             {success && !state.error ? (
-              <p className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">{success}</p>
+              <p className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
+                {success}
+              </p>
             ) : null}
 
             <ConfirmForm
               action={handleSubmit}
               title="تأكيد شحن الرصيد"
-              message={`هل تريد شحن رصيد ${selected.name || selected.phone || 'المستخدم'} بمبلغ ${Number(amount || 0).toLocaleString('ar')}؟`}
+              message={`هل تريد شحن رصيد ${selected.name || selected.phone || 'المستخدم'} بمبلغ ${Number(amount || 0).toLocaleString('ar')}؟ السبب: ${CHARGE_REASONS.find((item) => item.value === reason)?.label}${note.trim() ? ` — ${note.trim()}` : ''}`}
               confirmLabel="نعم، شحن الرصيد"
               className="space-y-4"
             >
               <input type="hidden" name="userId" value={selected.id} />
-              <FormField label="مبلغ الشحن" hint="سيتم إضافة المبلغ إلى رصيد الذهب والدينار">
+              <FormField
+                label="مبلغ الشحن"
+                hint="سيتم إضافة المبلغ إلى رصيد الذهب والدينار"
+              >
                 <input
                   name="amount"
                   type="number"
@@ -213,8 +243,41 @@ export default function ChargeBalancePanel({ users }: { users: UserRow[] }) {
                   className={inputClass}
                 />
               </FormField>
+              <FormField
+                label="سبب شحن الرصيد"
+                hint="يظهر هذا السبب في إشعار المستخدم وسجل المعاملات"
+              >
+                <select
+                  name="chargeReason"
+                  className={inputClass}
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  required
+                >
+                  {CHARGE_REASONS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField
+                label="تفاصيل السبب"
+                hint="تظهر للمستخدم في الإشعار — مطلوبة عند اختيار سبب آخر"
+              >
+                <textarea
+                  name="chargeNote"
+                  className={inputClass}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  required={reason === 'other'}
+                  maxLength={500}
+                />
+              </FormField>
               <div className="flex justify-end">
-                <SubmitButton pendingText="جاري الشحن...">شحن الرصيد</SubmitButton>
+                <SubmitButton pendingText="جاري الشحن...">
+                  شحن الرصيد
+                </SubmitButton>
               </div>
             </ConfirmForm>
           </div>

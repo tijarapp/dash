@@ -1,5 +1,9 @@
 'use client';
 
+import { monthlyProfitRate } from '@/lib/categoryProfit';
+
+import { transactionAmount, khairTransactionLabels } from '@/lib/transactionDisplay';
+
 import NavAnchor from '@/components/NavAnchor';
 import type {
   CategoryRow,
@@ -27,7 +31,9 @@ const typeLabels: Record<string, string> = {
   charge: 'شحن',
   withdraw: 'سحب',
   profit: 'ربح',
+  monthly_payout: 'دفعة شهرية (رأس مال وربح)',
   invest: 'استثمار',
+  ...khairTransactionLabels,
 };
 
 const statusLabels: Record<string, string> = {
@@ -371,7 +377,7 @@ export default function DashboardTables({
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
                   <th className="p-3">الفئة</th>
-                  <th className="p-3">الربح اليومي</th>
+                  <th className="p-3">نسبة الربح</th>
                   <th className="p-3">الاستثمارات</th>
                   <th className="p-3">الإجمالي</th>
                   <th className="p-3">الحالة</th>
@@ -381,7 +387,7 @@ export default function DashboardTables({
                 {categoriesPage.pageItems.map((cat) => (
                   <tr key={cat.id} className="border-t">
                     <td className="p-3 font-medium">{cat.title}</td>
-                    <td className="p-3">{cat.dailyProfitRate}%</td>
+                    <td className="p-3">{cat.payoutModel ? `${monthlyProfitRate(cat.minInvestment, cat.durationMonths, cat.expectedTotalReturn ?? cat.minInvestment).toFixed(2)}% شهري تقديري` : 'تحتاج إعداد شهري'}</td>
                     <td className="p-3">{cat.count}</td>
                     <td className="p-3">{cat.total > 0 ? cat.total.toLocaleString() : '—'}</td>
                     <td className="p-3">
@@ -437,10 +443,10 @@ export default function DashboardTables({
                     <td className="p-3">{userMap[t.userId] ?? t.userId}</td>
                     <td className="p-3">{typeLabels[t.type] ?? t.type}</td>
                     <td
-                      className={`p-3 font-medium ${t.dinarAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                      className={`p-3 font-medium ${transactionAmount(t) >= 0 ? 'text-green-600' : 'text-red-600'}`}
                     >
-                      {t.dinarAmount >= 0 ? '+' : ''}
-                      {t.dinarAmount.toLocaleString()}
+                      {transactionAmount(t) >= 0 ? '+' : ''}
+                      {transactionAmount(t).toLocaleString()}{t.paymentMethod === 'points' ? ' نقطة خير' : ''}
                     </td>
                     <td className="p-3 text-xs text-gray-500">
                       {formatDateTime(t.createdAt)}

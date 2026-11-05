@@ -1,102 +1,60 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
-import NavAnchor from '@/components/NavAnchor';
 import CategoryCardActions from '@/components/CategoryCardActions';
+import CategoryEditorModal from '@/components/CategoryEditorModal';
 import type { CategoryRow } from '@/lib/data';
-import { formatCategoryDuration } from '@/lib/categoryProfit';
+import { formatCategoryDuration, monthlyProfitRate } from '@/lib/categoryProfit';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 
+const amount = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
 export default function CategoryList({ categories }: { categories: CategoryRow[] }) {
-  const { pageItems, page, setPage, totalPages, totalItems, from, to } =
-    usePagination(categories, 8);
+  const [editing, setEditing] = useState<CategoryRow | null>(null);
+  const { pageItems, page, setPage, totalPages, totalItems, from, to } = usePagination(categories, 9);
 
-  if (categories.length === 0) {
-    return (
-      <Card>
-        <EmptyState message="لا توجد فئات استثمار بعد — أنشئ أول فئة من النموذج أعلاه" />
-      </Card>
-    );
-  }
+  if (categories.length === 0) return <Card><EmptyState message="لا توجد فئات استثمار بعد — أضف أول فئة من الزر أعلاه" /></Card>;
 
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {pageItems.map((c) => (
-          <Card key={c.id} className="group transition hover:shadow-md">
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <div className="flex h-20 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-gold/20 to-brand-gold/5 sm:h-16 sm:w-16">
-                {c.imageUrl ? (
-                  <Image
-                    src={c.imageUrl}
-                    alt={c.title}
-                    width={80}
-                    height={80}
-                    className="h-full w-full object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <span className="text-2xl">📊</span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900">{c.title}</h3>
-                    {c.description && (
-                      <p className="mt-0.5 line-clamp-2 text-sm text-gray-500">{c.description}</p>
-                    )}
-                  </div>
-                  <Badge status={c.isActive ? 'active' : 'inactive'} />
-                </div>
-
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-                  <div className="rounded-lg bg-gray-50 px-2 py-2 sm:px-3">
-                    <p className="text-[11px] text-gray-400 sm:text-xs">الربح اليومي</p>
-                    <p className="mt-0.5 text-sm font-semibold text-brand-blue">
-                      {c.dailyProfitRate}%
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 px-2 py-2 sm:px-3">
-                    <p className="text-[11px] text-gray-400 sm:text-xs">السعر</p>
-                    <p className="mt-0.5 text-sm font-semibold">
-                      {c.minInvestment.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 px-2 py-2 sm:px-3">
-                    <p className="text-[11px] text-gray-400 sm:text-xs">المدة</p>
-                    <p className="mt-0.5 text-sm font-semibold">
-                      {formatCategoryDuration(c.durationMonths)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
-                  <NavAnchor
-                    href={`/categories/${c.id}/edit`}
-                    className="rounded-lg bg-brand-blue/10 px-3 py-1.5 text-sm font-medium text-brand-blue transition hover:bg-brand-blue/20"
-                  >
-                    تعديل
-                  </NavAnchor>
-                  <CategoryCardActions category={c} />
-                </div>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        from={from}
-        to={to}
-        onPageChange={setPage}
-      />
+  return <div className="space-y-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {pageItems.map((category) => {
+        const monthly = Boolean(category.payoutModel);
+        const rate = monthly
+          ? monthlyProfitRate(category.minInvestment, category.durationMonths, category.expectedTotalReturn ?? category.minInvestment)
+          : 0;
+        return <article key={category.id} className="flex flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="relative mb-4 flex h-40 items-center justify-center overflow-hidden rounded-xl bg-gray-50">
+            {category.imageUrl ? <Image src={category.imageUrl} alt={category.title} width={400} height={160} className="h-full w-full object-contain" unoptimized /> : <span className="text-sm text-gray-500">لا توجد صورة</span>}
+            <div className="absolute end-2 top-2">{monthly ? <Badge status={category.isActive ? 'active' : 'inactive'} /> : <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">تحتاج إعداد</span>}</div>
+          </div>
+          <h3 className="break-words font-bold text-gray-900">{category.title}</h3>
+          <p className="mt-2 text-lg font-bold text-brand-blue">{amount(category.minInvestment)} <span className="text-sm font-medium">د.ع</span></p>
+          <p className="mt-0.5 text-xs text-gray-500">سعر الاشتراك</p>
+          {category.description && <p className="mt-3 line-clamp-2 text-sm leading-6 text-gray-500">{category.description}</p>}
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
+            <span className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-gray-600">{formatCategoryDuration(category.durationMonths)}</span>
+            <span className="rounded-lg bg-brand-blue/5 px-2.5 py-1.5 text-brand-blue">{monthly ? `${amount(rate)}% شهري تقديري` : 'أكمل بيانات الاستثمار الشهرية'}</span>
+          </div>
+          {monthly && <div className="mt-4 space-y-2 rounded-xl bg-gray-50 p-3 text-sm">
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-1"><span className="text-gray-500">الإجمالي المتوقع</span><span className="font-semibold text-gray-900">{amount(category.expectedTotalReturn ?? 0)} د.ع</span></div>
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-1"><span className="text-gray-500">متوسط الدفعة الشهرية</span><span className="font-semibold text-gray-900">{amount((category.expectedTotalReturn ?? 0) / category.durationMonths)} د.ع</span></div>
+            <p className="border-t border-gray-200 pt-2 text-xs leading-5 text-gray-500">تشمل الدفعات رأس المال المعاد وربحاً تقديرياً غير مضمون.</p>
+          </div>}
+          <div className="mt-auto pt-4">
+            <button type="button" onClick={() => setEditing(category)} aria-label={`تعديل فئة ${category.title}`} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+              تعديل الفئة
+            </button>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-1"><CategoryCardActions category={category} /></div>
+          </div>
+        </article>;
+      })}
     </div>
-  );
+    <Pagination page={page} totalPages={totalPages} totalItems={totalItems} from={from} to={to} onPageChange={setPage} />
+    {editing && <CategoryEditorModal key={editing.id} category={editing} onClose={() => setEditing(null)} />}
+  </div>;
 }

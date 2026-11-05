@@ -9,6 +9,7 @@ const typeLabels: Record<string, string> = {
   charge: 'شحن',
   withdraw: 'سحب',
   profit: 'ربح',
+  monthly_payout: 'دفعة شهرية (رأس مال وربح)',
   invest: 'استثمار',
 };
 

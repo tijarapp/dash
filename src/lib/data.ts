@@ -27,6 +27,8 @@ export interface CategoryRow {
   description: string;
   imageUrl: string;
   dailyProfitRate: number;
+  payoutModel?: 'monthly_capital_and_profit';
+  expectedTotalReturn?: number;
   minInvestment: number;
   durationMonths: number;
   isActive: boolean;
@@ -43,6 +45,9 @@ export interface UserRow {
 }
 
 export interface TransactionRow {
+  amount?: number;
+  paymentMethod?: string;
+  profitAmount?: number;
   id: string;
   userId: string;
   type: string;
@@ -156,31 +161,8 @@ export async function getOverviewStats() {
   };
 }
 
-async function migrateCategoryDurations(): Promise<void> {
-  const snap = await adminDb.collection('investmentCategories').get();
-  let batch = adminDb.batch();
-  let pending = 0;
-
-  for (const doc of snap.docs) {
-    const durationMonths = Number(doc.data().durationMonths);
-    if (durationMonths === CATEGORY_DURATION_MONTHS) continue;
-
-    batch.update(doc.ref, { durationMonths: CATEGORY_DURATION_MONTHS });
-    pending += 1;
-
-    if (pending % 400 === 0) {
-      await batch.commit();
-      batch = adminDb.batch();
-    }
-  }
-
-  if (pending % 400 !== 0) await batch.commit();
-}
-
 export async function listCategories(): Promise<CategoryRow[]> {
   if (DEMO_MODE) return demoCategories;
-
-  await migrateCategoryDurations();
 
   const snap = await adminDb.collection('investmentCategories').get();
   return snap.docs.map((doc) => {
@@ -191,6 +173,8 @@ export async function listCategories(): Promise<CategoryRow[]> {
       description: d.description ?? '',
       imageUrl: d.imageUrl ?? '',
       dailyProfitRate: Number(d.dailyProfitRate) || 0,
+      payoutModel: d.payoutModel === 'monthly_capital_and_profit' ? d.payoutModel : undefined,
+      expectedTotalReturn: d.payoutModel === 'monthly_capital_and_profit' ? Number(d.expectedTotalReturn) : undefined,
       minInvestment: Number(d.minInvestment) || 0,
       durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
       isActive: Boolean(d.isActive),
@@ -210,6 +194,8 @@ export async function getCategoryById(id: string): Promise<CategoryRow | null> {
     description: d.description ?? '',
     imageUrl: d.imageUrl ?? '',
     dailyProfitRate: Number(d.dailyProfitRate) || 0,
+    payoutModel: d.payoutModel === 'monthly_capital_and_profit' ? d.payoutModel : undefined,
+    expectedTotalReturn: d.payoutModel === 'monthly_capital_and_profit' ? Number(d.expectedTotalReturn) : undefined,
     minInvestment: Number(d.minInvestment) || 0,
     durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
     isActive: Boolean(d.isActive),
@@ -248,6 +234,9 @@ export async function listTransactions(): Promise<TransactionRow[]> {
       id: doc.id,
       userId: d.userId ?? '',
       type: d.type ?? 'unknown',
+      amount: typeof d.amount === 'number' ? d.amount : undefined,
+      paymentMethod: d.paymentMethod,
+      profitAmount: typeof d.profitAmount === 'number' ? d.profitAmount : undefined,
       goldAmount: Number(d.goldAmount) || 0,
       dinarAmount: Number(d.dinarAmount) || 0,
       status: d.status ?? 'completed',
@@ -470,8 +459,8 @@ export async function getDashboardData(): Promise<DashboardData> {
   const totalGoldBalance = users.reduce((sum, u) => sum + u.goldBalance, 0);
   const totalDinarBalance = users.reduce((sum, u) => sum + u.dinarBalance, 0);
   const totalProfitsDistributed = transactions
-    .filter((t) => t.type === 'profit' && t.status === 'completed')
-    .reduce((sum, t) => sum + Math.max(t.goldAmount, 0), 0);
+    .filter((t) => ['profit', 'monthly_payout'].includes(t.type) && t.status === 'completed')
+    .reduce((sum, t) => sum + Math.max(t.type === 'monthly_payout' ? (t.profitAmount ?? 0) : t.goldAmount, 0), 0);
   const pendingWithdrawals = withdrawRequests.filter((w) => w.status === 'pending');
   const pendingTransactions = transactions.filter((t) => t.status === 'pending').length;
   const investors = buildInvestorSummaries(users, investments);

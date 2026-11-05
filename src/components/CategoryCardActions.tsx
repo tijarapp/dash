@@ -8,7 +8,7 @@ import { ActionButton } from '@/components/ui/SubmitButton';
 export default function CategoryCardActions({ category }: { category: CategoryRow }) {
   return (
     <>
-      <ConfirmForm
+      {category.payoutModel ? <ConfirmForm
         action={toggleCategory.bind(null, category.id, !category.isActive)}
         title={category.isActive ? 'تأكيد إيقاف الفئة' : 'تأكيد تفعيل الفئة'}
         message={
@@ -21,7 +21,7 @@ export default function CategoryCardActions({ category }: { category: CategoryRo
         <ActionButton pendingText="جاري..." variant="ghost">
           {category.isActive ? 'إيقاف الفئة' : 'تفعيل الفئة'}
         </ActionButton>
-      </ConfirmForm>
+      </ConfirmForm> : <span className="text-xs text-amber-800">أكمل التفاصيل الشهرية أولاً</span>}
 
       <ConfirmForm
         action={deleteCategory.bind(null, category.id)}

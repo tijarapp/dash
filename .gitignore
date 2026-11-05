@@ -8,3 +8,4 @@ serviceAccount.json
 .DS_Store
 tsconfig.tsbuildinfo
 
+.next-dev/

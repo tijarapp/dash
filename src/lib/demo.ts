@@ -1,3 +1,4 @@
+import { MONTHLY_PAYOUT_MODEL } from './categoryProfit';
 import type {
   AppSettings,
   CategoryRow,
@@ -31,9 +32,16 @@ export const demoAppSettings: AppSettings = {
 
 export const demoCategories: CategoryRow[] = [
   {
+    id: 'monthly-example', title: 'استثمار شهري',
+    description: 'مثال قابل للتعديل بمبلغ ومدة وربح متوقع يحددهما المسؤول.',
+    imageUrl: '', dailyProfitRate: 0, payoutModel: MONTHLY_PAYOUT_MODEL,
+    minInvestment: 100000, durationMonths: 4, expectedTotalReturn: 120000,
+    isActive: true,
+  },
+  {
     id: 'cat-gold',
     title: 'سبائك الذهب',
-    description: 'استثمار في سبائك الذهب عيار 24 بعوائد يومية ثابتة.',
+    description: 'فئة استثمار تحتاج استكمال المدة والربح المتوقع.',
     imageUrl: '',
     dailyProfitRate: 0.45,
     minInvestment: 500,
@@ -53,7 +61,7 @@ export const demoCategories: CategoryRow[] = [
   {
     id: 'cat-realestate',
     title: 'العقارات',
-    description: 'صندوق عقاري طويل الأجل بعائد يومي ثابت.',
+    description: 'فئة استثمار عقاري تحتاج استكمال التفاصيل الشهرية.',
     imageUrl: '',
     dailyProfitRate: 0.5,
     minInvestment: 2000,

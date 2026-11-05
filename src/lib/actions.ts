@@ -1,15 +1,20 @@
 'use server';
 
-import { FieldValue, type DocumentReference, type Transaction } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  type DocumentReference,
+  type Transaction,
+} from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { adminDb } from './firebaseAdmin';
 import { requireAdmin } from './session';
 import { DEMO_MODE } from './demo';
+import { chargeReasonDetails } from './chargeReasons';
 import {
-  CATEGORY_DURATION_MONTHS,
-  validateDailyProfitRate,
-  validateInvestmentPrice,
+  MONTHLY_PAYOUT_MODEL,
+  monthlyTermsFromProfit,
+  validateMonthlyTerms,
 } from './categoryProfit';
 import { parseWithdrawMethod } from './withdraw';
 
@@ -22,19 +27,12 @@ function isValidTelegramSupport(value: string): boolean {
 }
 
 function categoryFinancialFields(formData: FormData) {
-  const dailyProfitRate = Number(formData.get('dailyProfitRate') ?? 0);
-  const rateError = validateDailyProfitRate(dailyProfitRate);
-  if (rateError) throw new Error(rateError);
-
-  const minInvestment = Number(formData.get('minInvestment') ?? 0);
-  const priceError = validateInvestmentPrice(minInvestment);
-  if (priceError) throw new Error(priceError);
-
-  return {
-    dailyProfitRate,
-    minInvestment,
-    durationMonths: CATEGORY_DURATION_MONTHS,
-  };
+  const minInvestment = Number(formData.get('minInvestment'));
+  const durationMonths = Number(formData.get('durationMonths'));
+  const rawProfit = String(formData.get('expectedProfit') ?? '').trim();
+  if (!rawProfit) throw new Error('أدخل الربح المتوقع لكامل المدة');
+  const terms = monthlyTermsFromProfit(minInvestment, durationMonths, Number(rawProfit));
+  return { ...terms, payoutModel: MONTHLY_PAYOUT_MODEL };
 }
 
 export async function createCategory(
@@ -75,6 +73,10 @@ export async function updateCategory(
     const id = String(formData.get('id') ?? '');
     if (!id) return { error: 'معرّف الفئة غير موجود' };
 
+    const existing = DEMO_MODE
+      ? (await import('./demo')).demoCategories.find((category) => category.id === id)
+      : (await adminDb.collection('investmentCategories').doc(id).get()).data();
+    if (!existing) return { error: 'الفئة غير موجودة' };
     const financial = categoryFinancialFields(formData);
     const title = String(formData.get('title') ?? '');
     const imageUrl = String(formData.get('imageUrl') ?? '');
@@ -85,6 +87,7 @@ export async function updateCategory(
       ...financial,
       isActive: formData.get('isActive') === 'true',
       annualYield: FieldValue.delete(),
+      dailyProfitRate: FieldValue.delete(),
     };
 
     if (DEMO_MODE) {
@@ -96,7 +99,7 @@ export async function updateCategory(
     await adminDb.collection('investmentCategories').doc(id).update(data);
 
     // Subscriptions denormalize category display fields at subscribe time.
-    // Keep those snapshots in sync so mobile users see admin edits.
+    // Only display metadata is synchronized. Financial terms belong to each subscription.
     const investmentsSnap = await adminDb
       .collection('investments')
       .where('categoryId', '==', id)
@@ -106,7 +109,6 @@ export async function updateCategory(
       const snapshotFields = {
         categoryTitle: title,
         categoryImageUrl: imageUrl,
-        dailyProfitRate: financial.dailyProfitRate,
       };
       let batch = adminDb.batch();
       let count = 0;
@@ -137,7 +139,14 @@ export async function toggleCategory(id: string, isActive: boolean) {
     revalidatePath('/categories');
     return;
   }
-  await adminDb.collection('investmentCategories').doc(id).update({ isActive });
+  const ref = adminDb.collection('investmentCategories').doc(id);
+  if (isActive) {
+    const data = (await ref.get()).data();
+    if (!data || data.payoutModel !== MONTHLY_PAYOUT_MODEL || validateMonthlyTerms(Number(data.minInvestment), Number(data.durationMonths), Number(data.expectedTotalReturn))) {
+      throw new Error('أكمل بيانات الاستثمار الشهرية أولاً');
+    }
+  }
+  await ref.update({ isActive });
   revalidatePath('/categories');
 }
 
@@ -160,6 +169,10 @@ export async function chargeUserBalance(
     await requireAdmin();
     const userId = String(formData.get('userId') ?? '');
     const amount = Number(formData.get('amount') ?? 0);
+    const { reasonText, ...reasonFields } = chargeReasonDetails(
+      formData.get('chargeReason'),
+      formData.get('chargeNote'),
+    );
 
     if (!userId) return { error: 'يرجى اختيار مستخدم' };
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -193,7 +206,8 @@ export async function chargeUserBalance(
         goldAmount: amount,
         dinarAmount: amount,
         status: 'completed',
-        note: 'شحن رصيد من لوحة التحكم',
+        note: reasonText,
+        ...reasonFields,
         createdAt: FieldValue.serverTimestamp(),
       });
 
@@ -201,7 +215,8 @@ export async function chargeUserBalance(
       txn.set(notifRef, {
         userId,
         title: 'تم شحن الرصيد',
-        body: `تم شحن رصيدك بمبلغ ${amount.toLocaleString('ar')}.`,
+        body: `تم شحن رصيدك بمبلغ ${amount.toLocaleString('ar')} دينار. السبب: ${reasonText}.`,
+        ...reasonFields,
         read: false,
         createdAt: FieldValue.serverTimestamp(),
       });
@@ -234,9 +249,7 @@ function withdrawRejectionNotification(
   amount: number,
   adminNote?: string,
 ) {
-  const notePart = adminNote?.trim()
-    ? ` السبب: ${adminNote.trim()}`
-    : '';
+  const notePart = adminNote?.trim() ? ` السبب: ${adminNote.trim()}` : '';
   return {
     userId,
     title: 'تم رفض طلب السحب',
@@ -264,14 +277,18 @@ async function findWithdrawTransactionRefs(
       .map((doc) => doc.ref);
   }
 
-  const userTxns = adminDb.collection('transactions').where('userId', '==', userId);
+  const userTxns = adminDb
+    .collection('transactions')
+    .where('userId', '==', userId);
   const snap = await txn.get(userTxns);
 
   for (const doc of snap.docs) {
     const d = doc.data();
     if (d.type !== 'withdraw' || !statuses.includes(d.status ?? '')) continue;
 
-    const txnAmount = Math.abs(Number(d.goldAmount) || Number(d.dinarAmount) || 0);
+    const txnAmount = Math.abs(
+      Number(d.goldAmount) || Number(d.dinarAmount) || 0,
+    );
     if (txnAmount === amount) {
       return [doc.ref];
     }
@@ -286,7 +303,9 @@ async function findPendingWithdrawTransactionRefs(
   amount: number,
   withdrawRequestId: string,
 ): Promise<DocumentReference[]> {
-  return findWithdrawTransactionRefs(txn, userId, amount, withdrawRequestId, ['pending']);
+  return findWithdrawTransactionRefs(txn, userId, amount, withdrawRequestId, [
+    'pending',
+  ]);
 }
 
 export async function approveWithdraw(id: string) {
@@ -447,9 +466,7 @@ export async function updateWithdrawRequest(formData: FormData) {
       for (const ref of withdrawTxnRefs) {
         txn.update(ref, {
           status: 'rejected',
-          note: adminNote
-            ? `طلب سحب مرفوض: ${adminNote}`
-            : 'طلب سحب مرفوض',
+          note: adminNote ? `طلب سحب مرفوض: ${adminNote}` : 'طلب سحب مرفوض',
         });
       }
 
@@ -585,7 +602,8 @@ export async function syncWithdrawTransactionsWithRequests() {
     const userId = req.userId ?? '';
     const amount = Number(req.amount) || 0;
     const requestStatus = req.status as string;
-    const newTxnStatus = requestStatus === 'approved' ? 'completed' : 'rejected';
+    const newTxnStatus =
+      requestStatus === 'approved' ? 'completed' : 'rejected';
     const note = requestStatus === 'approved' ? 'سحب معتمد' : 'طلب سحب مرفوض';
 
     const linked = transactionsSnap.docs.find(
@@ -599,8 +617,15 @@ export async function syncWithdrawTransactionsWithRequests() {
 
     const match = transactionsSnap.docs.find((doc) => {
       const d = doc.data();
-      if (d.userId !== userId || d.type !== 'withdraw' || d.status !== 'pending') return false;
-      const txnAmount = Math.abs(Number(d.goldAmount) || Number(d.dinarAmount) || 0);
+      if (
+        d.userId !== userId ||
+        d.type !== 'withdraw' ||
+        d.status !== 'pending'
+      )
+        return false;
+      const txnAmount = Math.abs(
+        Number(d.goldAmount) || Number(d.dinarAmount) || 0,
+      );
       return txnAmount === amount;
     });
 
@@ -625,11 +650,19 @@ export async function updateAppSettings(
     await requireAdmin();
 
     const appVersion = String(formData.get('appVersion') ?? '').trim();
-    const supportWhatsapp = String(formData.get('supportWhatsapp') ?? '').trim();
-    const supportTelegram = String(formData.get('supportTelegram') ?? '').trim();
-    const chargeRequestNumber = String(formData.get('chargeRequestNumber') ?? '').trim();
+    const supportWhatsapp = String(
+      formData.get('supportWhatsapp') ?? '',
+    ).trim();
+    const supportTelegram = String(
+      formData.get('supportTelegram') ?? '',
+    ).trim();
+    const chargeRequestNumber = String(
+      formData.get('chargeRequestNumber') ?? '',
+    ).trim();
     const iosAppUrl = String(formData.get('iosAppUrl') ?? '').trim();
-    const googlePlayAppUrl = String(formData.get('googlePlayAppUrl') ?? '').trim();
+    const googlePlayAppUrl = String(
+      formData.get('googlePlayAppUrl') ?? '',
+    ).trim();
 
     if (!appVersion) return { error: 'أدخل إصدار التطبيق' };
     if (!supportWhatsapp) return { error: 'أدخل رقم واتساب الدعم' };
@@ -638,10 +671,14 @@ export async function updateAppSettings(
       return { error: 'رابط تطبيق iOS يجب أن يبدأ بـ http:// أو https://' };
     }
     if (googlePlayAppUrl && !/^https?:\/\//i.test(googlePlayAppUrl)) {
-      return { error: 'رابط تطبيق Google Play يجب أن يبدأ بـ http:// أو https://' };
+      return {
+        error: 'رابط تطبيق Google Play يجب أن يبدأ بـ http:// أو https://',
+      };
     }
     if (supportTelegram && !isValidTelegramSupport(supportTelegram)) {
-      return { error: 'أدخل اسم مستخدم تيليجرام صحيحاً (مثل @username) أو رابط t.me' };
+      return {
+        error: 'أدخل اسم مستخدم تيليجرام صحيحاً (مثل @username) أو رابط t.me',
+      };
     }
 
     if (DEMO_MODE) {
@@ -665,7 +702,8 @@ export async function updateAppSettings(
     revalidatePath('/settings');
     return { error: null };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'فشل حفظ الإعدادات';
+    const message =
+      error instanceof Error ? error.message : 'فشل حفظ الإعدادات';
     return { error: message };
   }
 }
