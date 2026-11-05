@@ -74,7 +74,9 @@ in `settings/khair.currentRoundId` after closing so the app can display it.
 
 ## Seed and deploy
 
-The user confirmed that development and production share `tijara-app1`.
+Development and production share the project configured by `FIREBASE_PROJECT_ID`.
+In the commands below, replace `YOUR_FIREBASE_PROJECT_ID` with that project ID
+from your local environment configuration.
 The seed creates only missing cards and creates an active seven-day test round
 only when no active/current round exists. Existing data is preserved. Images are
 initially empty; upload card images and banners through the admin screen.
@@ -82,7 +84,7 @@ initially empty; upload card images and banners through the admin screen.
 From the admin repository:
 
 ```sh
-node --env-file=.env.local scripts/seed-khair.mjs tijara-app1
+node --env-file=.env.local scripts/seed-khair.mjs YOUR_FIREBASE_PROJECT_ID
 npm run build
 ```
 
@@ -91,7 +93,7 @@ From the mobile repository's `firebase` directory:
 ```sh
 npm --prefix functions run build
 firebase emulators:exec --only firestore --project demo-khair 'node --test functions/test/khair.cjs'
-firebase deploy --project tijara-app1 --only functions:purchaseKhairCard,functions:adminCancelKhairPurchase,functions:adminGrantKhairPoints,functions:adminSaveKhairRound,functions:closeExpiredKhairRounds,firestore:rules,firestore:indexes
+firebase deploy --project YOUR_FIREBASE_PROJECT_ID --only functions:purchaseKhairCard,functions:adminCancelKhairPurchase,functions:adminGrantKhairPoints,functions:adminSaveKhairRound,functions:closeExpiredKhairRounds,firestore:rules,firestore:indexes
 ```
 
 The admin panel must be deployed using its existing Next.js hosting workflow.
@@ -104,7 +106,7 @@ these optional for v1 and the product decision is still open.
 
 ## Verification on 2026-11-03
 
-- All five Khair functions deployed successfully to `tijara-app1`.
+- All five Khair functions deployed successfully to the configured Firebase project.
 - Firestore rules released; purchase and points-history index queries succeed.
 - Three cards and `khair-test-round` seeded. The round ends at
   `2026-11-10T16:47:42.363Z` (19:47 Baghdad).
@@ -132,4 +134,4 @@ Legacy ROUND_ID_USER_ID purchase records remain readable/refundable and block re
 
 ## Fixed catalog rollout
 
-Run `node --env-file=.env.local scripts/sync-khair-catalog.mjs tijara-app1` to preview the catalog normalization, then append `--apply` to restore the three canonical definitions and hide extra cards. Extra documents and all purchase history are retained. The mobile app must be rebuilt for per-type purchase availability; earlier builds watch only the legacy single-purchase document.
+Run `node --env-file=.env.local scripts/sync-khair-catalog.mjs YOUR_FIREBASE_PROJECT_ID` to preview the catalog normalization, then append `--apply` to restore the three canonical definitions and hide extra cards. Extra documents and all purchase history are retained. The mobile app must be rebuilt for per-type purchase availability; earlier builds watch only the legacy single-purchase document.
