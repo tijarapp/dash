@@ -279,7 +279,7 @@ export default function DashboardTables({
       </section>
 
       <section>
-        <SectionTitle title="جميع الاستثمارات" />
+        <div id="investments" className="scroll-mt-20"><SectionTitle title="جميع الاستثمارات" /></div>
         <div className="space-y-3 md:hidden">
           {investmentsPage.pageItems.map((inv) => (
             <div key={inv.id} className="rounded-2xl bg-white p-4 shadow-sm">

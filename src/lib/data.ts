@@ -1,6 +1,7 @@
 import { adminDb } from './firebaseAdmin';
 import { CATEGORY_DURATION_MONTHS } from './categoryProfit';
 import { mapWithdrawDoc } from './withdraw';
+import { buildDashboardActivity, type DashboardActivity } from './dashboardOverview';
 import {
   DEMO_MODE,
   demoAppSettings,
@@ -121,6 +122,7 @@ export interface DashboardData {
     investmentsCount: number;
     totalInvested: number;
     pendingWithdrawals: number;
+    pendingWithdrawalAmount: number;
     totalGoldBalance: number;
     totalDinarBalance: number;
     activeCategories: number;
@@ -135,6 +137,7 @@ export interface DashboardData {
   recentTransactions: TransactionRow[];
   pendingWithdrawals: WithdrawRow[];
   categories: CategoryRow[];
+  activity: DashboardActivity;
 }
 
 function isoFrom(value: FirebaseFirestore.Timestamp | undefined): string | null {
@@ -307,12 +310,14 @@ export async function getAppSettings(): Promise<AppSettings> {
   };
 }
 
-export async function listInvestments(): Promise<InvestmentRow[]> {
+export async function listInvestments(
+  categoriesPromise?: Promise<CategoryRow[]>,
+): Promise<InvestmentRow[]> {
   if (DEMO_MODE) return demoDashboardData().investments;
 
   const [investmentsSnap, categories] = await Promise.all([
     adminDb.collection('investments').get(),
-    listCategories(),
+    categoriesPromise ?? listCategories(),
   ]);
 
   const categoryMap = new Map(categories.map((c) => [c.id, c.title]));
@@ -451,12 +456,14 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
 export async function getDashboardData(): Promise<DashboardData> {
   if (DEMO_MODE) return demoDashboardData();
 
-  const [users, investments, transactions, withdrawRequests, categories] = await Promise.all([
+  const categoriesPromise = listCategories();
+  const [users, investments, transactions, pendingWithdrawalsSnap, categories, pendingTransactionsSnap] = await Promise.all([
     listUsers(),
-    listInvestments(),
+    listInvestments(categoriesPromise),
     listTransactions(),
-    listWithdrawRequests(),
-    listCategories(),
+    adminDb.collection('withdrawRequests').where('status', '==', 'pending').get(),
+    categoriesPromise,
+    adminDb.collection('transactions').where('status', '==', 'pending').count().get(),
   ]);
 
   const totalInvested = investments.reduce((sum, inv) => sum + inv.amount, 0);
@@ -465,8 +472,11 @@ export async function getDashboardData(): Promise<DashboardData> {
   const totalProfitsDistributed = transactions
     .filter((t) => ['profit', 'monthly_payout'].includes(t.type) && t.status === 'completed')
     .reduce((sum, t) => sum + Math.max(t.type === 'monthly_payout' ? (t.profitAmount ?? 0) : t.goldAmount, 0), 0);
-  const pendingWithdrawals = withdrawRequests.filter((w) => w.status === 'pending');
-  const pendingTransactions = transactions.filter((t) => t.status === 'pending').length;
+  const pendingWithdrawals = pendingWithdrawalsSnap.docs.map((doc) => {
+    const data = doc.data();
+    return { ...mapWithdrawDoc(doc.id, data), createdAt: isoFrom(data.createdAt) };
+  }).sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  const pendingTransactions = pendingTransactionsSnap.data().count;
   const investors = buildInvestorSummaries(users, investments);
   const regularUsers = buildRegularUsers(users, investments);
 
@@ -477,6 +487,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       investmentsCount: investments.length,
       totalInvested,
       pendingWithdrawals: pendingWithdrawals.length,
+      pendingWithdrawalAmount: pendingWithdrawals.reduce((sum, request) => sum + request.amount, 0),
       totalGoldBalance,
       totalDinarBalance,
       activeCategories: categories.filter((c) => c.isActive).length,
@@ -491,5 +502,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     recentTransactions: transactions.slice(0, 10),
     pendingWithdrawals: pendingWithdrawals.slice(0, 5),
     categories,
+    activity: buildDashboardActivity(investments, transactions),
   };
 }

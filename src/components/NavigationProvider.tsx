@@ -24,7 +24,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   const navigate = useCallback(
     (href: string) => {
-      if (href === pathname) return;
+      if (href === `${pathname}${window.location.search}${window.location.hash}`) return;
       startTransition(() => {
         router.push(href);
       });

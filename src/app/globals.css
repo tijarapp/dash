@@ -2,15 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --dashboard-bg: #f7f6f2;
+  --dashboard-surface: #fff;
+  --dashboard-text: #292524;
+  --dashboard-muted: #73706b;
+  --dashboard-line: #f0eeea;
+  --dashboard-chart: #86b2e2;
+  --dashboard-chart-fill: #edf3fa;
+  --dashboard-accent: #477eac;
+}
+
 html,
 body {
-  background-color: #f4f6fa;
-  color: #19213d;
+  background-color: var(--dashboard-bg);
+  color: var(--dashboard-text);
   overflow-x: hidden;
 }
 
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid #477eac;
+  outline-offset: 3px;
+}
+
+button, a, select {
+  touch-action: manipulation;
+}
+
+button:disabled {
+  cursor: wait;
+}
+
+@layer components {
+  .overview-page {
+    @apply mx-auto w-full max-w-[1800px];
+  }
+
+  .overview-control {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-transparent bg-white px-3 py-2 text-xs font-medium text-stone-700 transition-colors hover:border-stone-200 hover:bg-stone-50 disabled:opacity-60;
+  }
+
+  .overview-control:focus-within {
+    outline: 2px solid var(--dashboard-accent);
+    outline-offset: 3px;
+  }
+
+  .overview-metric {
+    @apply block min-w-0 rounded-2xl border border-transparent bg-white px-4 py-4 transition-colors hover:border-stone-200;
+  }
+
+  .overview-icon {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-xl;
+    background: #eff5fb;
+    color: var(--dashboard-accent);
+  }
+
+  .overview-icon-amber {
+    @apply bg-amber-50 text-amber-700;
+  }
+
+  .overview-compact {
+    @apply flex items-start justify-between gap-3 rounded-2xl bg-white px-4 py-3;
+  }
+
+  .overview-section-heading {
+    @apply mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--dashboard-muted)];
+  }
+
+  .overview-section-heading h2 {
+    @apply font-semibold;
+  }
+
+  .overview-section-heading h2 span {
+    @apply font-normal;
+  }
+
+  .overview-section-heading > span {
+    @apply text-[11px];
+  }
+
+  .overview-chart {
+    @apply min-w-0 rounded-2xl bg-white px-4 pb-3 pt-4;
+  }
+
+  .overview-chart-tooltip {
+    @apply pointer-events-none absolute z-10 w-[180px] rounded-2xl border border-stone-100 bg-white p-3 text-stone-600 shadow-lg;
+  }
+
+  .overview-panel {
+    @apply overflow-hidden rounded-2xl bg-white;
+  }
+
+  .overview-panel-heading {
+    @apply flex min-h-16 flex-wrap items-center justify-between gap-2 border-b border-[var(--dashboard-line)] px-5 py-3;
+  }
+
+  .overview-panel-heading h2 {
+    @apply text-sm font-semibold;
+  }
+
+  .overview-text-link {
+    @apply inline-flex min-h-8 items-center gap-1 text-xs font-medium text-[var(--dashboard-accent)] hover:underline;
+  }
+
+  .overview-transaction {
+    @apply flex items-center gap-3 px-5 py-3 transition-colors hover:bg-stone-50;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .daily-profit-slider {

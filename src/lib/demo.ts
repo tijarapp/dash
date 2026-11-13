@@ -1,4 +1,5 @@
 import { MONTHLY_PAYOUT_MODEL } from './categoryProfit';
+import { buildDashboardActivity } from './dashboardOverview';
 import type {
   AppSettings,
   CategoryRow,
@@ -173,6 +174,7 @@ export function demoDashboardData(): DashboardData {
       investmentsCount: demoInvestments.length,
       totalInvested,
       pendingWithdrawals: pendingWithdrawals.length,
+      pendingWithdrawalAmount: pendingWithdrawals.reduce((sum, request) => sum + request.amount, 0),
       totalGoldBalance,
       totalDinarBalance,
       activeCategories: demoCategories.filter((c) => c.isActive).length,
@@ -187,6 +189,7 @@ export function demoDashboardData(): DashboardData {
     recentTransactions: demoTransactions.slice(0, 10),
     pendingWithdrawals: pendingWithdrawals.slice(0, 5),
     categories: demoCategories,
+    activity: buildDashboardActivity(demoInvestments, demoTransactions, new Date(), Number.POSITIVE_INFINITY),
   };
 }
 
