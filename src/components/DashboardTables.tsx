@@ -1,7 +1,5 @@
 'use client';
 
-import { monthlyProfitRate } from '@/lib/categoryProfit';
-
 import { transactionAmount, khairTransactionLabels } from '@/lib/transactionDisplay';
 
 import NavAnchor from '@/components/NavAnchor';
@@ -387,7 +385,7 @@ export default function DashboardTables({
                 {categoriesPage.pageItems.map((cat) => (
                   <tr key={cat.id} className="border-t">
                     <td className="p-3 font-medium">{cat.title}</td>
-                    <td className="p-3">{cat.payoutModel ? `${monthlyProfitRate(cat.minInvestment, cat.durationMonths, cat.expectedTotalReturn ?? cat.minInvestment).toFixed(2)}% شهري تقديري` : 'تحتاج إعداد شهري'}</td>
+                    <td className="p-3">{cat.payoutModel && cat.profitPercent !== undefined ? `${cat.profitPercent}% لكامل المدة` : 'تحتاج إعداد شهري'}</td>
                     <td className="p-3">{cat.count}</td>
                     <td className="p-3">{cat.total > 0 ? cat.total.toLocaleString() : '—'}</td>
                     <td className="p-3">

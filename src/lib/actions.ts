@@ -2,6 +2,7 @@
 
 import {
   FieldValue,
+  Timestamp,
   type DocumentReference,
   type Transaction,
 } from 'firebase-admin/firestore';
@@ -13,8 +14,9 @@ import { DEMO_MODE } from './demo';
 import { chargeReasonDetails } from './chargeReasons';
 import {
   MONTHLY_PAYOUT_MODEL,
-  monthlyTermsFromProfit,
+  monthlyTermsFromPercent,
   validateMonthlyTerms,
+  validateProfitPercent,
 } from './categoryProfit';
 import { parseWithdrawMethod } from './withdraw';
 
@@ -29,10 +31,15 @@ function isValidTelegramSupport(value: string): boolean {
 function categoryFinancialFields(formData: FormData) {
   const minInvestment = Number(formData.get('minInvestment'));
   const durationMonths = Number(formData.get('durationMonths'));
-  const rawProfit = String(formData.get('expectedProfit') ?? '').trim();
-  if (!rawProfit) throw new Error('أدخل الربح المتوقع لكامل المدة');
-  const terms = monthlyTermsFromProfit(minInvestment, durationMonths, Number(rawProfit));
+  const rawPercent = String(formData.get('profitPercent') ?? '').trim();
+  if (!rawPercent) throw new Error('حدد نسبة الربح لكامل المدة');
+  const terms = monthlyTermsFromPercent(minInvestment, durationMonths, Number(rawPercent));
   return { ...terms, payoutModel: MONTHLY_PAYOUT_MODEL };
+}
+
+/** One entry per rate change; claims weight each day by the rate in force. */
+function rateHistoryEntry(percent: number) {
+  return { percent, effectiveAt: Timestamp.now() };
 }
 
 export async function createCategory(
@@ -53,6 +60,7 @@ export async function createCategory(
       description: String(formData.get('description') ?? ''),
       imageUrl: String(formData.get('imageUrl') ?? ''),
       ...financial,
+      rateHistory: [rateHistoryEntry(financial.profitPercent)],
       isActive: true,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -96,10 +104,22 @@ export async function updateCategory(
       return { error: null };
     }
 
-    await adminDb.collection('investmentCategories').doc(id).update(data);
+    // A changed percentage starts a new rate period for every active investment
+    // in the category; earlier days keep the rate that was in force.
+    const categoryRef = adminDb.collection('investmentCategories').doc(id);
+    await adminDb.runTransaction(async (txn) => {
+      const current = (await txn.get(categoryRef)).data();
+      if (!current) throw new Error('الفئة غير موجودة');
+      const history = Array.isArray(current.rateHistory) ? current.rateHistory : [];
+      const changed = history.length === 0 || current.profitPercent !== financial.profitPercent;
+      txn.update(categoryRef, {
+        ...data,
+        ...(changed ? { rateHistory: [...history, rateHistoryEntry(financial.profitPercent)] } : {}),
+      });
+    });
 
     // Subscriptions denormalize category display fields at subscribe time.
-    // Only display metadata is synchronized. Financial terms belong to each subscription.
+    // Only display metadata is synchronized; amount and duration belong to each subscription.
     const investmentsSnap = await adminDb
       .collection('investments')
       .where('categoryId', '==', id)
@@ -142,7 +162,9 @@ export async function toggleCategory(id: string, isActive: boolean) {
   const ref = adminDb.collection('investmentCategories').doc(id);
   if (isActive) {
     const data = (await ref.get()).data();
-    if (!data || data.payoutModel !== MONTHLY_PAYOUT_MODEL || validateMonthlyTerms(Number(data.minInvestment), Number(data.durationMonths), Number(data.expectedTotalReturn))) {
+    if (!data || data.payoutModel !== MONTHLY_PAYOUT_MODEL || typeof data.profitPercent !== 'number' ||
+        validateProfitPercent(data.profitPercent) ||
+        validateMonthlyTerms(Number(data.minInvestment), Number(data.durationMonths), Number(data.expectedTotalReturn))) {
       throw new Error('أكمل بيانات الاستثمار الشهرية أولاً');
     }
   }
@@ -155,6 +177,16 @@ export async function deleteCategory(id: string) {
   if (DEMO_MODE) {
     revalidatePath('/categories');
     return;
+  }
+  // Claims read the category's rate history, so it must outlive its running investments.
+  const running = await adminDb
+    .collection('investments')
+    .where('categoryId', '==', id)
+    .where('status', '==', 'active')
+    .limit(1)
+    .get();
+  if (!running.empty) {
+    throw new Error('لا يمكن حذف فئة فيها استثمارات نشطة. أوقف الفئة بدلاً من حذفها.');
   }
   await adminDb.collection('investmentCategories').doc(id).delete();
   revalidatePath('/categories');

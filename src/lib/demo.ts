@@ -33,9 +33,9 @@ export const demoAppSettings: AppSettings = {
 export const demoCategories: CategoryRow[] = [
   {
     id: 'monthly-example', title: 'استثمار شهري',
-    description: 'مثال قابل للتعديل بمبلغ ومدة وربح متوقع يحددهما المسؤول.',
+    description: 'مثال قابل للتعديل بمبلغ ومدة ونسبة ربح يحددها المسؤول.',
     imageUrl: '', dailyProfitRate: 0, payoutModel: MONTHLY_PAYOUT_MODEL,
-    minInvestment: 100000, durationMonths: 4, expectedTotalReturn: 120000,
+    minInvestment: 100000, durationMonths: 4, profitPercent: 20, expectedTotalReturn: 120000,
     isActive: true,
   },
   {

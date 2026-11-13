@@ -30,7 +30,7 @@ export default function EditCategoryForm({ category }: { category: CategoryRow }
       <ConfirmForm
         action={formAction}
         title="تأكيد حفظ التعديلات"
-        message={`هل تريد حفظ تعديلات فئة «${category.title}»؟`}
+        message={`هل تريد حفظ تعديلات فئة «${category.title}»؟ إذا غيّرت نسبة الربح فستُطبَّق النسبة الجديدة من الآن على جميع الاستثمارات النشطة في هذه الفئة.`}
         confirmLabel="نعم، حفظ"
         className="space-y-8"
       >

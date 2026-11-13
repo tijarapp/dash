@@ -28,6 +28,8 @@ export interface CategoryRow {
   imageUrl: string;
   dailyProfitRate: number;
   payoutModel?: 'monthly_capital_and_profit';
+  /** Profit for the whole duration as a percentage of capital (0–50). */
+  profitPercent?: number;
   expectedTotalReturn?: number;
   minInvestment: number;
   durationMonths: number;
@@ -174,6 +176,7 @@ export async function listCategories(): Promise<CategoryRow[]> {
       imageUrl: d.imageUrl ?? '',
       dailyProfitRate: Number(d.dailyProfitRate) || 0,
       payoutModel: d.payoutModel === 'monthly_capital_and_profit' ? d.payoutModel : undefined,
+      profitPercent: typeof d.profitPercent === 'number' ? d.profitPercent : undefined,
       expectedTotalReturn: d.payoutModel === 'monthly_capital_and_profit' ? Number(d.expectedTotalReturn) : undefined,
       minInvestment: Number(d.minInvestment) || 0,
       durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
@@ -195,6 +198,7 @@ export async function getCategoryById(id: string): Promise<CategoryRow | null> {
     imageUrl: d.imageUrl ?? '',
     dailyProfitRate: Number(d.dailyProfitRate) || 0,
     payoutModel: d.payoutModel === 'monthly_capital_and_profit' ? d.payoutModel : undefined,
+    profitPercent: typeof d.profitPercent === 'number' ? d.profitPercent : undefined,
     expectedTotalReturn: d.payoutModel === 'monthly_capital_and_profit' ? Number(d.expectedTotalReturn) : undefined,
     minInvestment: Number(d.minInvestment) || 0,
     durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,

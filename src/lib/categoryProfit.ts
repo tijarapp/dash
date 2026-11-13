@@ -1,8 +1,20 @@
 export const CATEGORY_DURATION_MONTHS = 24; // Fallback for existing unconfigured records.
 
+/** Profit for the whole duration, as a percentage of the invested capital. */
+export const MIN_PROFIT_PERCENT = 0;
+export const MAX_PROFIT_PERCENT = 50;
+export const PROFIT_PERCENT_STEP = 0.5;
+
 export function validateInvestmentPrice(value: number): string | null {
   if (!Number.isFinite(value) || value <= 0) {
     return 'أدخل سعر استثمار صحيحاً أكبر من صفر';
+  }
+  return null;
+}
+
+export function validateProfitPercent(value: number): string | null {
+  if (!Number.isFinite(value) || value < MIN_PROFIT_PERCENT || value > MAX_PROFIT_PERCENT) {
+    return `نسبة الربح يجب أن تكون بين ${MIN_PROFIT_PERCENT}% و${MAX_PROFIT_PERCENT}%`;
   }
   return null;
 }
@@ -35,17 +47,41 @@ export function validateMonthlyTerms(capital: number, months: number, total: num
   return null;
 }
 
-export function buildMonthlySchedule(capital: number, months: number, total: number) {
-  const error = validateMonthlyTerms(capital, months, total);
-  if (error) throw new Error(error);
+/**
+ * Profit (minor units) earned through `month` at a constant percentage.
+ * Mirrors `profitUnitsThrough` in the claim Cloud Function so the preview
+ * matches what investors actually receive while the rate is unchanged.
+ */
+function profitUnitsThrough(capitalUnits: number, months: number, percent: number, month: number): number {
+  return Math.round((capitalUnits * (percent * month)) / (100 * months));
+}
+
+/** Admin picks a percentage; the stored total keeps capital + profit for existing consumers. */
+export function monthlyTermsFromPercent(capital: number, months: number, percent: number) {
+  const percentError = validateProfitPercent(percent);
+  if (percentError) throw new Error(percentError);
+  const priceError = validateInvestmentPrice(capital);
+  if (priceError) throw new Error(priceError);
+  if (!Number.isInteger(months) || months < 1 || months > 120) throw new Error('المدة يجب أن تكون بين شهر و120 شهراً');
   const capitalUnits = Math.round(capital * 100);
-  const profitUnits = Math.round(total * 100) - capitalUnits;
+  const totalUnits = capitalUnits + profitUnitsThrough(capitalUnits, months, percent, months);
+  if (!Number.isSafeInteger(totalUnits)) throw new Error('إجمالي المبلغ أكبر من الحد المسموح');
+  const expectedTotalReturn = totalUnits / 100;
+  const error = validateMonthlyTerms(capital, months, expectedTotalReturn);
+  if (error) throw new Error(error);
+  return { minInvestment: capital, durationMonths: months, profitPercent: percent, expectedTotalReturn };
+}
+
+/** Projected monthly claims at a constant percentage. */
+export function buildMonthlySchedule(capital: number, months: number, percent: number) {
+  monthlyTermsFromPercent(capital, months, percent);
+  const capitalUnits = Math.round(capital * 100);
   const capitalBase = Math.floor(capitalUnits / months);
-  const profitBase = Math.floor(profitUnits / months);
   return Array.from({ length: months }, (_, index) => {
     const last = index === months - 1;
     const principal = last ? capitalUnits - capitalBase * index : capitalBase;
-    const profit = last ? profitUnits - profitBase * index : profitBase;
+    const profit = profitUnitsThrough(capitalUnits, months, percent, index + 1) -
+      profitUnitsThrough(capitalUnits, months, percent, index);
     return {
       month: index + 1,
       principal: principal / 100,
@@ -56,39 +92,10 @@ export function buildMonthlySchedule(capital: number, months: number, total: num
   });
 }
 
-export function monthlyProfitRate(capital: number, months: number, total: number): number {
-  return ((total - capital) / months / capital) * 100;
-}
-
-/** Keep the original UTC day anchor, clamping short months instead of overflowing. */
-export function addCalendarMonths(start: Date, months: number): Date {
-  const result = new Date(start);
-  result.setUTCDate(1);
-  result.setUTCMonth(start.getUTCMonth() + months);
-  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
-  result.setUTCDate(Math.min(start.getUTCDate(), lastDay));
-  return result;
-}
-
-
-/** Admin enters net profit; stored totals include capital for existing consumers. */
-export function monthlyTermsFromProfit(capital: number, months: number, profit: number) {
-  const profitUnits = Math.round(profit * 100);
-  if (!Number.isFinite(profit) || profit < 0 || !Number.isSafeInteger(profitUnits) ||
-      Math.abs(profit * 100 - profitUnits) > 0.00001) {
-    throw new Error('أدخل الربح المتوقع لكامل المدة بمنزلتين عشريتين كحد أقصى، ويمكن إدخال صفر');
-  }
-  const totalUnits = Math.round(capital * 100) + profitUnits;
-  if (!Number.isSafeInteger(totalUnits)) throw new Error('إجمالي المبلغ أكبر من الحد المسموح');
-  const expectedTotalReturn = totalUnits / 100;
-  const error = validateMonthlyTerms(capital, months, expectedTotalReturn);
-  if (error) throw new Error(error);
-  return { minInvestment: capital, durationMonths: months, expectedTotalReturn };
-}
-
-
-/** The stored next date supports explicit rescheduling; older records use their calendar anchor. */
-export function nextMonthlyPayoutDate(start: Date, month: number, nextDate?: Date): Date {
-  if (nextDate && Number.isFinite(nextDate.getTime())) return nextDate;
-  return addCalendarMonths(start, month);
+/** Percentage for categories saved before the slider: derived from their stored total. */
+export function percentFromTotal(capital: number, total: number | undefined): number {
+  if (!Number.isFinite(capital) || capital <= 0 || total === undefined || !Number.isFinite(total)) return 0;
+  const percent = ((total - capital) / capital) * 100;
+  const stepped = Math.round(percent / PROFIT_PERCENT_STEP) * PROFIT_PERCENT_STEP;
+  return Math.min(MAX_PROFIT_PERCENT, Math.max(MIN_PROFIT_PERCENT, stepped));
 }

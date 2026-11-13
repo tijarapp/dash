@@ -1,87 +1,108 @@
-# Monthly investment integration
+# Monthly investments: percentage, claims and countdown
+
+## How it works
+
+- The administrator sets, per category, an investment amount, a duration in
+  months and a **profit percentage between 0% and 50%** with a slider.
+- The percentage is the profit for the **whole duration**. 10,000 at 50% returns
+  15,000 in total whether the duration is one month or three.
+- Capital and profit are paid in equal monthly parts. Each month the investor
+  presses **Claim** in the mobile app and receives that month's share of capital
+  plus that month's profit. The administrator does not send or approve payouts.
+- The administrator can move the slider at any time. The new percentage applies
+  **from the moment it is saved** to every active investment in the category;
+  earlier days keep the percentage that was in force.
+
+Example: 10,000 for one 30-day month, 50% for the first 25 days and 10% for the
+last 5 days. Profit = 10,000 × (50% × 25/30 + 10% × 5/30) = 4,333.33, so the
+claim pays 14,333.33.
+
+## Data
+
+`investmentCategories/{id}`
+
+| Field | Meaning |
+| --- | --- |
+| `payoutModel` | `monthly_capital_and_profit` |
+| `minInvestment`, `durationMonths` | Amount and term (1–120 months) |
+| `profitPercent` | Current percentage, 0–50, for the whole duration |
+| `rateHistory` | `[{ percent, effectiveAt }]`, one entry per change, oldest first |
+| `expectedTotalReturn` | Derived: capital + capital × percent / 100 |
+
+`investments/{id}` stores `amount`, `durationMonths`, `startDate`, `paidMonths`,
+`recoveredAmount`, `totalProfit`, `totalIncome`, `nextPayoutAt`, `status`, plus
+`profitPercent` (the percentage at subscription, used only if the category has
+no rate history). Amount and duration are frozen at subscription. The rate is
+not: claims always read the category's `rateHistory`, which is the single
+source of truth. For that reason a category with active investments cannot be
+deleted; stop it instead.
+
+Each claimed month writes `investments/{id}/monthlyPayouts/{month}`, a ledger
+entry `transactions/monthly_{id}_{month}` (type `monthly_payout`, with
+`principalAmount` and `profitAmount`) and a notification.
+
+## Profit formula
+
+The same formula is implemented in three places and must stay identical:
+
+- Cloud Function: `firebase/functions/src/monthlyInvestments.ts`
+  (`averageRate`, `profitUnitsThrough`) in the Flutter repository
+- Admin preview: `src/lib/categoryProfit.ts` (`buildMonthlySchedule`)
+- Mobile: `lib/features/investments/domain/utils/monthly_payout_calculator.dart`
+
+Rules:
+
+1. Month `m` runs from `start + (m − 1)` calendar months to `start + m` calendar
+   months (same UTC day and time, clamped in short months).
+2. `avg(m)` is the time-weighted average percentage over that month.
+3. Profit earned through month `m`, in minor units, is
+   `round(capitalUnits × (avg(1) + … + avg(m)) / (100 × months))`.
+   A month's profit is the difference between two consecutive values, so at a
+   constant percentage the months add up exactly to `capital × percent / 100`.
+4. Capital per month is `floor(capitalUnits / months)`; the last month takes the
+   remainder.
 
 ## Administrator workflow
 
-Create a category with a custom title, investment amount, duration in months,
-and expected net profit for the entire term (excluding capital). There are no
-fixed sector presets. The server derives the total projected return by adding
-capital and expected profit. A preview separates returned capital and projected profit,
-with rounding remainders assigned to the final installment.
+`/categories` → create or edit a category → set amount, months and the
+percentage slider. The form previews the profit, the total and the monthly
+schedule at the chosen percentage. Saving an edit with a different percentage
+appends a `rateHistory` entry; saving without changing it does not.
 
-Monthly categories use `payoutModel: "monthly_capital_and_profit"`,
-`minInvestment`, `durationMonths` (1–120), and `expectedTotalReturn`.
-They do not use `dailyProfitRate`. Production categories are not automatically
-seeded. Demo mode includes one editable monthly example.
+There is no payouts page. Claims appear under `/transactions` and on each
+user's page as `monthly_payout` entries.
 
-At `/monthly-payouts`, each active monthly subscription shows its next unpaid
-month, date, projected profit and returned capital. Once due, the administrator
-must explicitly enter actual approved profit (zero is allowed) and confirm the
-payment. Projected profit is never automatically credited. Approval atomically
-updates both existing wallet balances, actual profit/income totals, returned
-capital, a unique monthly payment record, ledger and notification. A unique
-subscription/month key prevents double credit during retries or concurrent
-approvals. The last installment closes the subscription with no extra principal
-refund. Paid installments are retained under `investments/{id}/monthlyPayouts`.
-Investment losses require a separate accounting decision; the projection and
-approval screen do not constitute a guarantee against losses.
-
-## Mobile and Firebase implementation
+## Mobile and Firebase
 
 Companion repository: `/Volumes/hussendev/Flutter project/tjaraa_tech`.
 
-- `subscribeMonthlyInvestment` callable reads current active category terms,
-  rejects stale price/term confirmations, deducts both existing wallet balances
-  atomically and freezes subscription terms. Client request IDs make retries
-  idempotent.
-- First due date is one calendar month after subscription. Due dates preserve
-  the original UTC day/time, clamping shorter months rather than overflowing.
-- Flutter shows monthly rate/projections, scheduled payments, actual returned
-  capital, remaining capital, actual profit/income and next payout date.
-- Wallet entries label monthly payouts separately and show their principal and
-  actual profit components.
-- Monthly payments are the only investment system. The old daily callable now
-  rejects requests without writing to wallets, and the Flutter daily-claim feature
-  and its registration have been removed. Home shows a monthly-payment explanation.
-- Rules reject all client-side investment creation. Every subscription goes
-  through the monthly callable; payout and ledger records are also server-managed.
-- Unconfigured categories remain editable in the dashboard with a setup badge.
-  Flutter hides them from available categories and rejects direct navigation to
-  categories that are inactive or lack valid monthly terms.
+- `subscribeMonthlyInvestment` (callable) checks the confirmed amount, duration
+  and `profitPercent` against the live category, deducts the wallet and creates
+  the investment. Client request IDs make retries idempotent.
+- `claimMonthlyInvestment({ investmentId })` (callable) pays every month that is
+  due in one transaction, credits both wallet balances, and marks the
+  investment `expired` after the last month. Payout, ledger and notification
+  documents use deterministic IDs and are created with `create`, so retries or
+  concurrent taps cannot pay a month twice. Only the owner can claim.
+- The investment details page shows a live days/hours/minutes/seconds countdown
+  to the next payment and switches to the Claim button when it is due. The
+  investments list shows a "ready to claim" badge.
+- Firestore rules are unchanged: clients cannot create or update investments,
+  payouts or `monthly_payout` ledger entries.
 
-Existing categories can be edited and saved as monthly categories using custom
-amount, months and expected net profit. Saving a category alone does not change
-existing financial subscriptions. The category editor no longer offers daily
-rate fields.
+## Not included
 
-At `/monthly-payouts`, existing unconfigured test subscriptions can be set up.
-After converting their category, review each subscription's new duration and net
-expected profit and confirm conversion. The original invested amount is retained.
-Previous payouts remain profit; previous capital recovery is archived and reset
-to zero for the new plan. Lifetime profit/income counters are preserved, with
-`legacyProfit`/`legacyIncome` snapshots for separate mobile presentation. The
-conversion date begins the new calendar schedule, with the first payment one
-month later. No wallet credit or debit happens on conversion. A transaction
-archives the complete old subscription under `migrations/monthly_v1` and prevents
-repeat conversion. Investments with different amounts require an explicitly
-entered expected profit rather than an inferred financial rate.
-
-Daily accrual is retired entirely. Category reads perform no automatic data
-migration or invent expected profits. Category updates synchronize display
-metadata only; financial subscription setup is explicit.
+- No push notification when a payment becomes claimable.
+- No migration of investments created under the previous admin-approval
+  system; the project has not launched and that data is test data.
 
 ## Rollout
 
-The owner confirmed the project has not launched. The implementation uses only
-the monthly system; obsolete daily inputs and accrual calculations are removed.
-The daily callable is retained solely as a disabled compatibility endpoint so
-old test builds cannot credit wallets after deployment.
-
-Changes are local and not deployed. Deploy the monthly callable, disabled daily
-endpoint, category trigger and Firestore rules before enabling subscriptions.
-Release the Flutter/admin changes together. Existing categories need an admin to
-enter their intended amount, duration and expected net profit before becoming
-available; existing test subscriptions have an explicit setup flow with archived
-history. No production data is reset or deleted by these source changes.
+Nothing is deployed by these changes. Deploy the functions
+(`subscribeMonthlyInvestment`, `claimMonthlyInvestment`) and release the admin
+and mobile apps together: the new mobile app sends `profitPercent` when
+subscribing, and categories need a saved percentage before they can be
+activated or subscribed to.
 
 ## Verification
 
@@ -98,9 +119,11 @@ Flutter repository:
 - `npm run build --prefix firebase/functions`
 - `firebase emulators:exec --project demo-monthly-investments --config firebase/firebase.monthly-test.json --only firestore 'GCLOUD_PROJECT=demo-monthly-investments node firebase/functions/test/monthly-investments.cjs'`
 
-For the administration integration test, run the same emulator configuration
-from the admin repository with its full path and execute
-`GCLOUD_PROJECT=demo-monthly-investments node scripts/test-monthly-payouts.cjs`.
-It verifies actual-vs-projected profit, due dates, ordering, authorization,
-concurrent duplicate protection, closing capital and client write restrictions.
-Tests require a demo project and emulator and never connect to production.
+The emulator test covers subscription terms, the rate maths, the 25-day/5-day
+example, ownership, due dates, duplicate protection and exact totals.
+
+The admin category actions (first rate period, appended changes, unchanged
+saves, delete protection) are checked with the same emulator configuration:
+run the command above from the Flutter repository with
+`node /Volumes/hussendev/backend/admin/scripts/test-category-rates.cjs` as the
+script. Both tests require a demo project and never connect to production.

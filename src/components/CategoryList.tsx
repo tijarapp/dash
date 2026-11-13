@@ -5,7 +5,7 @@ import Image from 'next/image';
 import CategoryCardActions from '@/components/CategoryCardActions';
 import CategoryEditorModal from '@/components/CategoryEditorModal';
 import type { CategoryRow } from '@/lib/data';
-import { formatCategoryDuration, monthlyProfitRate } from '@/lib/categoryProfit';
+import { formatCategoryDuration } from '@/lib/categoryProfit';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
@@ -24,9 +24,11 @@ export default function CategoryList({ categories }: { categories: CategoryRow[]
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {pageItems.map((category) => {
         const monthly = Boolean(category.payoutModel);
-        const rate = monthly
-          ? monthlyProfitRate(category.minInvestment, category.durationMonths, category.expectedTotalReturn ?? category.minInvestment)
-          : 0;
+        const rateLabel = !monthly
+          ? 'أكمل بيانات الاستثمار الشهرية'
+          : category.profitPercent === undefined
+            ? 'حدّد نسبة الربح'
+            : `${amount(category.profitPercent)}% ربح لكامل المدة`;
         return <article key={category.id} className="flex flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="relative mb-4 flex h-40 items-center justify-center overflow-hidden rounded-xl bg-gray-50">
             {category.imageUrl ? <Image src={category.imageUrl} alt={category.title} width={400} height={160} className="h-full w-full object-contain" unoptimized /> : <span className="text-sm text-gray-500">لا توجد صورة</span>}
@@ -38,12 +40,12 @@ export default function CategoryList({ categories }: { categories: CategoryRow[]
           {category.description && <p className="mt-3 line-clamp-2 text-sm leading-6 text-gray-500">{category.description}</p>}
           <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
             <span className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-gray-600">{formatCategoryDuration(category.durationMonths)}</span>
-            <span className="rounded-lg bg-brand-blue/5 px-2.5 py-1.5 text-brand-blue">{monthly ? `${amount(rate)}% شهري تقديري` : 'أكمل بيانات الاستثمار الشهرية'}</span>
+            <span className="rounded-lg bg-brand-blue/5 px-2.5 py-1.5 text-brand-blue">{rateLabel}</span>
           </div>
           {monthly && <div className="mt-4 space-y-2 rounded-xl bg-gray-50 p-3 text-sm">
-            <div className="flex flex-wrap justify-between gap-x-3 gap-y-1"><span className="text-gray-500">الإجمالي المتوقع</span><span className="font-semibold text-gray-900">{amount(category.expectedTotalReturn ?? 0)} د.ع</span></div>
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-1"><span className="text-gray-500">الإجمالي على النسبة الحالية</span><span className="font-semibold text-gray-900">{amount(category.expectedTotalReturn ?? 0)} د.ع</span></div>
             <div className="flex flex-wrap justify-between gap-x-3 gap-y-1"><span className="text-gray-500">متوسط الدفعة الشهرية</span><span className="font-semibold text-gray-900">{amount((category.expectedTotalReturn ?? 0) / category.durationMonths)} د.ع</span></div>
-            <p className="border-t border-gray-200 pt-2 text-xs leading-5 text-gray-500">تشمل الدفعات رأس المال المعاد وربحاً تقديرياً غير مضمون.</p>
+            <p className="border-t border-gray-200 pt-2 text-xs leading-5 text-gray-500">يستلم المستثمر كل شهر جزءاً من رأس المال مع ربح ذلك الشهر.</p>
           </div>}
           <div className="mt-auto pt-4">
             <button type="button" onClick={() => setEditing(category)} aria-label={`تعديل فئة ${category.title}`} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">

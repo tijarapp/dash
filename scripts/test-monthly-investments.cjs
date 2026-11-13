@@ -9,14 +9,16 @@ const compiled = ts.transpileModule(readFileSync(filename, 'utf8'), {
 }).outputText;
 const mod = new Module(filename, module);
 mod._compile(compiled, filename);
-const { buildMonthlySchedule, validateMonthlyTerms, monthlyTermsFromProfit, monthlyProfitRate } = mod.exports;
+const { buildMonthlySchedule, validateMonthlyTerms, validateProfitPercent, monthlyTermsFromPercent, percentFromTotal } = mod.exports;
 const units = (value) => Math.round(value * 100);
-// Various arbitrary amounts and durations; no fixed sector catalog.
-for (const [capital, months, total] of [[25000, 1, 40000], [75000, 3, 100000], [12345.67, 7, 14445.68], [1100000, 12, 1500000], [3000000, 14, 4500000], [6000000, 18, 9000000]]) {
-  const rows = buildMonthlySchedule(capital, months, total);
+// Various arbitrary amounts, durations and percentages; no fixed sector catalog.
+for (const [capital, months, percent] of [[10000, 1, 50], [75000, 3, 40], [12345.67, 7, 17.5], [1100000, 12, 36.5], [3000000, 14, 50], [6000000, 18, 0.5], [100, 3, 0]]) {
+  const { expectedTotalReturn: total } = monthlyTermsFromPercent(capital, months, percent);
+  const rows = buildMonthlySchedule(capital, months, percent);
   assert.equal(rows.length, months);
+  assert.equal(units(total), units(capital) + Math.round(units(capital) * percent / 100));
   assert.equal(rows.reduce((sum, row) => sum + units(row.principal), 0), units(capital));
-  assert.equal(rows.reduce((sum, row) => sum + units(row.expectedProfit), 0), units(total - capital));
+  assert.equal(rows.reduce((sum, row) => sum + units(row.expectedProfit), 0), units(total) - units(capital));
   assert.equal(rows.reduce((sum, row) => sum + units(row.expectedPayment), 0), units(total));
   let remaining = units(capital);
   for (const row of rows) {
@@ -27,21 +29,29 @@ for (const [capital, months, total] of [[25000, 1, 40000], [75000, 3, 100000], [
   }
   assert.equal(rows.at(-1).remainingCapital, 0);
 }
-const split = buildMonthlySchedule(75000, 3, 100000);
-assert.equal(split[0].expectedPayment, 33333.33);
-assert.equal(split[2].expectedPayment, 33333.34);
-assert.deepEqual(buildMonthlySchedule(25000, 1, 40000)[0], {
-  month: 1, principal: 25000, expectedProfit: 15000, expectedPayment: 40000, remainingCapital: 0,
+// The owner's example: 10,000 for one month at 50% returns 15,000.
+assert.deepEqual(monthlyTermsFromPercent(10000, 1, 50), { minInvestment: 10000, durationMonths: 1, profitPercent: 50, expectedTotalReturn: 15000 });
+assert.deepEqual(buildMonthlySchedule(10000, 1, 50)[0], {
+  month: 1, principal: 10000, expectedProfit: 5000, expectedPayment: 15000, remainingCapital: 0,
 });
-assert.equal(monthlyProfitRate(25000, 1, 40000), 60);
-assert.equal(buildMonthlySchedule(100, 3, 100).reduce((n, r) => n + r.expectedProfit, 0), 0);
-for (const args of [[0, 1, 1], [100, 0, 150], [100, 1.5, 150], [100, 121, 150], [100, 3, 99], [NaN, 1, 150], [100, 3, Infinity], [1.001, 3, 2], [100, 3, 150.001], [1e20, 1, 1e21]]) {
-  assert.ok(validateMonthlyTerms(...args));
-  assert.throws(() => buildMonthlySchedule(...args));
+// The percentage covers the whole duration, not each month.
+assert.equal(monthlyTermsFromPercent(10000, 3, 50).expectedTotalReturn, 15000);
+assert.deepEqual(buildMonthlySchedule(10000, 3, 50).map((row) => row.expectedProfit), [1666.67, 1666.66, 1666.67]);
+assert.equal(buildMonthlySchedule(100, 3, 0).reduce((n, r) => n + r.expectedProfit, 0), 0);
+for (const percent of [-0.5, 50.5, NaN, Infinity]) {
+  assert.ok(validateProfitPercent(percent));
+  assert.throws(() => monthlyTermsFromPercent(100, 3, percent));
+  assert.throws(() => buildMonthlySchedule(100, 3, percent));
 }
-assert.deepEqual(monthlyTermsFromProfit(100000, 4, 20000), { minInvestment: 100000, durationMonths: 4, expectedTotalReturn: 120000 });
-assert.equal(monthlyTermsFromProfit(0.1, 7, 0.2).expectedTotalReturn, 0.3);
-assert.equal(monthlyTermsFromProfit(12345.67, 7, 2100.01).expectedTotalReturn, 14445.68);
-assert.equal(monthlyTermsFromProfit(100, 2, 0).expectedTotalReturn, 100);
-for (const profit of [-1, NaN, Infinity, 0.001]) assert.throws(() => monthlyTermsFromProfit(100, 3, profit));
-console.log('Monthly investment checks passed: custom amounts/terms/profits, exact totals, remaining capital, rounding and invalid inputs.');
+for (const percent of [0, 0.5, 25, 50]) assert.equal(validateProfitPercent(percent), null);
+for (const [capital, months] of [[0, 1], [100, 0], [100, 1.5], [100, 121], [NaN, 1], [1.001, 3], [1e20, 1]]) {
+  assert.throws(() => monthlyTermsFromPercent(capital, months, 10));
+  assert.throws(() => buildMonthlySchedule(capital, months, 10));
+}
+for (const args of [[0, 1, 1], [100, 0, 150], [100, 3, 99], [100, 3, 150.001]]) assert.ok(validateMonthlyTerms(...args));
+// Categories saved before the slider open on the nearest allowed percentage.
+assert.equal(percentFromTotal(100000, 120000), 20);
+assert.equal(percentFromTotal(25000, 40000), 50);
+assert.equal(percentFromTotal(100, 99), 0);
+assert.equal(percentFromTotal(0, undefined), 0);
+console.log('Monthly investment checks passed: percentages, whole-duration totals, exact schedules, rounding and invalid inputs.');

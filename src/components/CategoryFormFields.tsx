@@ -50,7 +50,7 @@ export default function CategoryFormFields({
           التفاصيل المالية
         </h3>
         {category && !category.payoutModel && <p className="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-brand-blue">
-          أكمل المبلغ والمدة والربح المتوقع لتفعيل هذه الفئة بنظام الدفعات الشهرية.
+          أكمل المبلغ والمدة ونسبة الربح لتفعيل هذه الفئة بنظام الدفعات الشهرية.
         </p>}
         <MonthlyInvestmentFields category={category} />
       </section>

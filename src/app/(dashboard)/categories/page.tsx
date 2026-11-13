@@ -1,4 +1,3 @@
-import NavAnchor from '@/components/NavAnchor';
 import CreateCategoryForm from '@/components/CreateCategoryForm';
 import CategoryList from '@/components/CategoryList';
 import PageHeader from '@/components/ui/PageHeader';
@@ -26,9 +25,9 @@ export default async function CategoriesPage() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h2 className="text-lg font-bold text-gray-900">الفئات الحالية <span className="mr-2 text-sm font-normal text-gray-500">({categories.length})</span></h2>
-          <p className="mt-1 text-sm text-gray-500">يمكن تعديل اسم كل فئة وصورتها وتفاصيلها المالية. أدخل المبلغ والمدة والربح المتوقع لكل فئة لتكون متاحة للاشتراك.</p>
+          <p className="mt-1 text-sm text-gray-500">يمكن تعديل اسم كل فئة وصورتها وتفاصيلها المالية. حدّد المبلغ والمدة ونسبة الربح لكل فئة لتكون متاحة للاشتراك.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2"><NavAnchor href="/monthly-payouts" className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">إعداد الاشتراكات الحالية</NavAnchor><CreateCategoryForm /></div>
+        <div className="flex flex-wrap items-center gap-2"><CreateCategoryForm /></div>
       </div>
       <CategoryList categories={categories} />
     </section>
