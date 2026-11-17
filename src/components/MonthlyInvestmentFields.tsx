@@ -7,6 +7,7 @@ import {
   MIN_PROFIT_PERCENT,
   PROFIT_PERCENT_STEP,
   buildMonthlySchedule,
+  clampProfitPercent,
   monthlyTermsFromPercent,
   percentFromTotal,
 } from '@/lib/categoryProfit';
@@ -18,8 +19,11 @@ export default function MonthlyInvestmentFields({ category }: { category?: Categ
   const id = useId();
   const [capital, setCapital] = useState(String(category?.minInvestment ?? ''));
   const [months, setMonths] = useState(String(category?.durationMonths ?? ''));
-  const [percent, setPercent] = useState(
-    category?.profitPercent ?? percentFromTotal(category?.minInvestment ?? 0, category?.expectedTotalReturn),
+  // Older categories may hold a percentage outside today's range (e.g. 0%); open on the nearest allowed value.
+  const [percent, setPercent] = useState(() =>
+    category?.profitPercent !== undefined
+      ? clampProfitPercent(category.profitPercent)
+      : percentFromTotal(category?.minInvestment ?? 0, category?.expectedTotalReturn),
   );
   const complete = capital.trim() !== '' && months.trim() !== '';
   let total = 0;

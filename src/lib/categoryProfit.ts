@@ -1,8 +1,8 @@
 export const CATEGORY_DURATION_MONTHS = 24; // Fallback for existing unconfigured records.
 
 /** Profit for the whole duration, as a percentage of the invested capital. */
-export const MIN_PROFIT_PERCENT = 0;
-export const MAX_PROFIT_PERCENT = 50;
+export const MIN_PROFIT_PERCENT = 1;
+export const MAX_PROFIT_PERCENT = 100;
 export const PROFIT_PERCENT_STEP = 0.5;
 
 export function validateInvestmentPrice(value: number): string | null {
@@ -92,10 +92,15 @@ export function buildMonthlySchedule(capital: number, months: number, percent: n
   });
 }
 
-/** Percentage for categories saved before the slider: derived from their stored total. */
-export function percentFromTotal(capital: number, total: number | undefined): number {
-  if (!Number.isFinite(capital) || capital <= 0 || total === undefined || !Number.isFinite(total)) return 0;
-  const percent = ((total - capital) / capital) * 100;
+/** Snaps a percentage to the slider's step and allowed range. */
+export function clampProfitPercent(percent: number): number {
+  if (!Number.isFinite(percent)) return MIN_PROFIT_PERCENT;
   const stepped = Math.round(percent / PROFIT_PERCENT_STEP) * PROFIT_PERCENT_STEP;
   return Math.min(MAX_PROFIT_PERCENT, Math.max(MIN_PROFIT_PERCENT, stepped));
+}
+
+/** Percentage for categories saved before the slider: derived from their stored total. */
+export function percentFromTotal(capital: number, total: number | undefined): number {
+  if (!Number.isFinite(capital) || capital <= 0 || total === undefined || !Number.isFinite(total)) return MIN_PROFIT_PERCENT;
+  return clampProfitPercent(((total - capital) / capital) * 100);
 }

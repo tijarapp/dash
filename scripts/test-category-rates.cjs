@@ -22,6 +22,7 @@ const actions = load(resolve(__dirname, '../src/lib/actions.ts'), {
   './session': { requireAdmin: async () => { if (!authorized) throw Error('Unauthorized'); return { uid: 'admin' }; } },
   'next/cache': { revalidatePath() {} }, 'next/navigation': { redirect() {} },
   './categoryProfit': financial, './withdraw': {}, './chargeReasons': {},
+  './homeTicker': load(resolve(__dirname, '../src/lib/homeTicker.ts'), {}),
 });
 function form(fields) {
   const data = new FormData();
@@ -34,7 +35,7 @@ const save = (id, profitPercent, extra = {}) => actions.updateCategory({ error: 
   for (const doc of (await db.collection('investmentCategories').where('title', '==', 'rates').get()).docs) await doc.ref.delete();
 
   // Creating a category stores the percentage, the derived total and the first rate period.
-  for (const profitPercent of ['', -1, 50.5, 'x']) {
+  for (const profitPercent of ['', -1, 0, 100.5, 'x']) {
     assert.ok((await actions.createCategory({ error: null }, form({ ...base, profitPercent }))).error);
   }
   assert.equal((await actions.createCategory({ error: null }, form({ ...base, profitPercent: 50 }))).error, null);
@@ -62,12 +63,18 @@ const save = (id, profitPercent, extra = {}) => actions.updateCategory({ error: 
   assert.ok(data.rateHistory[1].effectiveAt.toMillis() >= first);
   assert.deepEqual([data.profitPercent, data.expectedTotalReturn], [10, 11000]);
 
-  // Out-of-range percentages and unauthorized callers change nothing.
-  assert.ok((await save(ref.id, 51)).error);
+  // Out-of-range percentages (outside 1–100) and unauthorized callers change nothing.
+  for (const profitPercent of [0, 0.5, 100.5]) assert.ok((await save(ref.id, profitPercent)).error);
   authorized = false;
   assert.ok((await save(ref.id, 20)).error);
   authorized = true;
   assert.equal((await ref.get()).data().rateHistory.length, 2);
+
+  // The whole 1–100 range is accepted, including values above the old 50% cap.
+  assert.equal((await save(ref.id, 100)).error, null);
+  data = (await ref.get()).data();
+  assert.deepEqual(data.rateHistory.map((entry) => entry.percent), [50, 10, 100]);
+  assert.deepEqual([data.profitPercent, data.expectedTotalReturn], [100, 20000]);
 
   // Categories saved before rate tracking get their first period on the next save.
   const legacy = db.doc('investmentCategories/rates-legacy');

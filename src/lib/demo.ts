@@ -29,6 +29,7 @@ export const demoAppSettings: AppSettings = {
   chargeRequestNumber: '962791234567',
   iosAppUrl: 'https://apps.apple.com/app/id000000000',
   googlePlayAppUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+  homeTickerText: 'مرحباً بكم في دار الأساس — فرص استثمار جديدة متاحة الآن',
 };
 
 export const demoCategories: CategoryRow[] = [

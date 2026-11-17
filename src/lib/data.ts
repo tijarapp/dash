@@ -20,6 +20,8 @@ export interface AppSettings {
   chargeRequestNumber: string;
   iosAppUrl: string;
   googlePlayAppUrl: string;
+  /** Scrolling text above the app's home banner; empty hides it. */
+  homeTickerText: string;
 }
 
 export interface CategoryRow {
@@ -29,7 +31,7 @@ export interface CategoryRow {
   imageUrl: string;
   dailyProfitRate: number;
   payoutModel?: 'monthly_capital_and_profit';
-  /** Profit for the whole duration as a percentage of capital (0–50). */
+  /** Profit for the whole duration as a percentage of capital (1–100). */
   profitPercent?: number;
   expectedTotalReturn?: number;
   minInvestment: number;
@@ -296,6 +298,7 @@ export async function getAppSettings(): Promise<AppSettings> {
       chargeRequestNumber: '',
       iosAppUrl: '',
       googlePlayAppUrl: '',
+      homeTickerText: '',
     };
   }
 
@@ -307,6 +310,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     chargeRequestNumber: String(d.chargeRequestNumber ?? ''),
     iosAppUrl: String(d.iosAppUrl ?? ''),
     googlePlayAppUrl: String(d.googlePlayAppUrl ?? ''),
+    homeTickerText: String(d.homeTickerText ?? ''),
   };
 }
 

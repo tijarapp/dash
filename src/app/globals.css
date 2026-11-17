@@ -165,3 +165,27 @@ button:disabled {
   background: linear-gradient(to right, #86efac, #22c55e, #86efac);
 }
 
+
+/* Preview of the app's home ticker. The parent is LTR so the left padding
+   (one strip width) parks the text just past the right edge; the track then
+   slides its full width to the left until the text has left the strip. */
+.home-ticker-track {
+  display: inline-block;
+  padding-left: 100%;
+  white-space: nowrap;
+  animation: home-ticker-rtl 15s linear infinite;
+  will-change: transform;
+}
+
+@keyframes home-ticker-rtl {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-ticker-track {
+    padding-left: 0;
+    white-space: normal;
+    animation: none;
+  }
+}

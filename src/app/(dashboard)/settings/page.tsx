@@ -1,3 +1,4 @@
+import HomeTickerForm from '@/components/HomeTickerForm';
 import SettingsForm from '@/components/SettingsForm';
 import PageHeader from '@/components/ui/PageHeader';
 import { getAppSettings } from '@/lib/data';
@@ -11,8 +12,9 @@ export default async function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="الإعدادات"
-        description="إدارة إصدار التطبيق وروابط المتاجر وأرقام الدعم وطلبات الشحن"
+        description="إدارة الشريط المتحرك في الرئيسية وإصدار التطبيق وروابط المتاجر وأرقام الدعم وطلبات الشحن"
       />
+      <HomeTickerForm text={settings.homeTickerText} />
       <SettingsForm settings={settings} />
     </div>
   );

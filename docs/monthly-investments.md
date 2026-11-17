@@ -3,7 +3,7 @@
 ## How it works
 
 - The administrator sets, per category, an investment amount, a duration in
-  months and a **profit percentage between 0% and 50%** with a slider.
+  months and a **profit percentage between 1% and 100%** with a slider.
 - The percentage is the profit for the **whole duration**. 10,000 at 50% returns
   15,000 in total whether the duration is one month or three.
 - Capital and profit are paid in equal monthly parts. Each month the investor
@@ -25,7 +25,7 @@ claim pays 14,333.33.
 | --- | --- |
 | `payoutModel` | `monthly_capital_and_profit` |
 | `minInvestment`, `durationMonths` | Amount and term (1–120 months) |
-| `profitPercent` | Current percentage, 0–50, for the whole duration |
+| `profitPercent` | Current percentage, 1–100, for the whole duration |
 | `rateHistory` | `[{ percent, effectiveAt }]`, one entry per change, oldest first |
 | `expectedTotalReturn` | Derived: capital + capital × percent / 100 |
 

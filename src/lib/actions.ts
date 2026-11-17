@@ -19,6 +19,7 @@ import {
   validateProfitPercent,
 } from './categoryProfit';
 import { parseWithdrawMethod } from './withdraw';
+import { HOME_TICKER_MAX_LENGTH, normalizeHomeTickerText } from './homeTicker';
 
 export type FormActionState = { error: string | null };
 
@@ -736,6 +737,38 @@ export async function updateAppSettings(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'فشل حفظ الإعدادات';
+    return { error: message };
+  }
+}
+
+/// Saves the scrolling text shown above the home banner in the app. Empty hides it.
+export async function updateHomeTicker(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    await requireAdmin();
+    const homeTickerText = normalizeHomeTickerText(
+      String(formData.get('homeTickerText') ?? ''),
+    );
+    if (homeTickerText.length > HOME_TICKER_MAX_LENGTH) {
+      return { error: `نص الشريط يجب ألا يتجاوز ${HOME_TICKER_MAX_LENGTH} حرفاً` };
+    }
+
+    if (DEMO_MODE) {
+      revalidatePath('/settings');
+      return { error: null };
+    }
+
+    // Merge so the rest of `settings/app` (version, support numbers) is untouched.
+    await adminDb.doc('settings/app').set(
+      { homeTickerText, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    revalidatePath('/settings');
+    return { error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'فشل حفظ نص الشريط';
     return { error: message };
   }
 }
