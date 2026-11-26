@@ -269,7 +269,7 @@ export default function RoundsTab({
       {winnersFor ? (
         <WinnersModal
           round={winnersFor}
-          cards={data.cards.filter((card) => card.isActive)}
+          cards={data.cards}
           busy={busy}
           run={run}
           error={error}

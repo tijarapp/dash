@@ -1,39 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { inputClass } from '@/components/ui/FormField';
 import Modal from '@/components/ui/Modal';
+import WinnerPicker, { normalizeDigits } from './WinnerPicker';
 import {
   btn,
   formatIqd,
   InlineAlert,
   khairApi,
+  Pill,
   type KhairCard,
   type KhairRound,
   type KhairWinner,
   type RunAction,
 } from './shared';
 
-type Purchaser = { userId: string; userName: string; userPhone: string; referralCode: string; chances: number };
-type Row = { cardId: string; userId: string; userName: string; referralCode: string; amount: string };
-
+type Selection = Pick<KhairWinner, 'userId' | 'userName' | 'referralCode'> & { amount: string };
 const VISIBILITY = [
   { value: 'auto', label: 'تلقائي', help: 'تظهر القائمة عند نهاية الجولة وتختفي عند بدء جولة جديدة.' },
   { value: 'shown', label: 'إظهار الآن', help: 'تظهر القائمة في التطبيق فوراً حتى لو لم تنتهِ الجولة.' },
-  { value: 'hidden', label: 'إخفاء', help: 'لا تظهر القائمة في التطبيق.' },
+  { value: 'hidden', label: 'إخفاء', help: 'تبقى القائمة مخفية في التطبيق.' },
 ] as const;
 
-function toRows(winners: KhairWinner[] = []): Row[] {
-  return winners.map((w) => ({
-    cardId: w.cardId,
-    userId: w.userId,
-    userName: w.userName,
-    referralCode: w.referralCode,
-    amount: String(w.amount),
-  }));
+function readAmount(value: string) {
+  const normalized = normalizeDigits(value).trim().replace(/٫/g, '.').replace(/٬/g, ',');
+  return /^(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(normalized)
+    ? Number(normalized.replace(/,/g, ''))
+    : NaN;
 }
 
-/** Lets the admin choose the winners of each card for one round and control when the app shows them. */
 export default function WinnersModal({
   round,
   cards,
@@ -49,37 +45,60 @@ export default function WinnersModal({
   error: string;
   onClose: () => void;
 }) {
-  const [rows, setRows] = useState<Row[]>(() => toRows(round.winners));
-  const [visibility, setVisibility] = useState<'auto' | 'shown' | 'hidden'>(round.winnersVisibility ?? 'auto');
-  const [localError, setLocalError] = useState('');
+  const [drafts, setDrafts] = useState<Partial<Record<string, Selection | null>>>({});
+  const [openPicker, setOpenPicker] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState(round.winnersVisibility ?? 'auto');
+  const [invalidCardId, setInvalidCardId] = useState<string | null>(null);
+
+  const cardRows = cards.map((card) => {
+    const saved = (round.winners ?? []).filter((winner) => winner.cardId === card.id);
+    const previous = saved.length === 1 ? { ...saved[0], amount: String(saved[0].amount) } : null;
+    const draft = drafts[card.id];
+    return { card, saved, selection: draft === undefined ? previous : draft, edited: draft !== undefined };
+  });
+  const selectedCount = cardRows.filter(({ selection }) => selection).length;
+  const total = cardRows.reduce((sum, { selection, saved, edited }) => {
+    if (!edited) return sum + saved.reduce((subtotal, winner) => subtotal + winner.amount, 0);
+    const amount = readAmount(selection?.amount ?? '');
+    return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000_000 ? sum + amount : sum;
+  }, 0);
+
+  function update(cardId: string, selection: Selection | null | undefined) {
+    setDrafts((previous) => ({ ...previous, [cardId]: selection }));
+    if (invalidCardId === cardId) setInvalidCardId(null);
+  }
 
   function save() {
-    setLocalError('');
-    for (const row of rows) {
-      const amount = Number(row.amount);
-      if (!Number.isFinite(amount) || amount <= 0) return setLocalError(`أدخل مبلغ الفوز لـ «${row.userName}»`);
+    const winnerChanges: { cardId: string; userId: string | null; amount?: number }[] = [];
+    for (const { card, selection, edited, saved } of cardRows) {
+      if (!edited) continue;
+      if (!selection) {
+        if (saved.length) winnerChanges.push({ cardId: card.id, userId: null });
+        continue;
+      }
+      const amount = readAmount(selection.amount);
+      if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000) {
+        setInvalidCardId(card.id);
+        document.getElementById('winner-amount-' + card.id)?.focus();
+        return;
+      }
+      if (saved.length === 1 && saved[0].userId === selection.userId && saved[0].amount === amount) continue;
+      winnerChanges.push({ cardId: card.id, userId: selection.userId, amount });
     }
+    setInvalidCardId(null);
     void run(
-      () =>
-        khairApi('', {
-          action: 'saveWinners',
-          roundId: round.id,
-          visibility,
-          winners: rows.map((row) => ({ cardId: row.cardId, userId: row.userId, amount: Number(row.amount) })),
-        }),
+      () => khairApi('', { action: 'saveWinners', roundId: round.id, visibility, winnerChanges }),
       'تم حفظ الفائزين',
     ).then((ok) => {
       if (ok) onClose();
     });
   }
 
-  const shownError = localError || error;
-
   return (
     <Modal
       open
-      title={`فائزو «${round.title}»`}
-      description="اختر فائزاً أو أكثر لكل بطاقة، مع المبلغ الذي فاز به. لا يمكن تكرار نفس الشخص في نفس البطاقة."
+      title={'فائزو «' + round.title + '»'}
+      description="اختر فائزًا واحدًا لكل بطاقة وحدّد مبلغ جائزته بالدينار العراقي."
       onClose={onClose}
       closeDisabled={busy}
       footer={
@@ -93,177 +112,167 @@ export default function WinnersModal({
         </>
       }
     >
-      <div className="space-y-6">
-        {shownError ? <InlineAlert tone="error">{shownError}</InlineAlert> : null}
-
-        <div>
-          <p className="mb-2 text-sm font-medium text-gray-700">ظهور القائمة في التطبيق</p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {VISIBILITY.map((option) => (
-              <label
-                key={option.value}
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
-                  visibility === option.value ? 'border-brand-blue bg-brand-blue/5' : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="winnersVisibility"
-                  checked={visibility === option.value}
-                  onChange={() => setVisibility(option.value)}
-                  className="mt-1 accent-brand-blue"
-                />
-                <span>
-                  <span className="block text-sm font-semibold text-gray-900">{option.label}</span>
-                  <span className="block text-xs leading-5 text-gray-500">{option.help}</span>
-                </span>
-              </label>
-            ))}
-          </div>
+      <div className="space-y-4">
+        {error && <InlineAlert tone="error">{error}</InlineAlert>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-gray-900">الفائزون حسب البطاقة</h3>
+          <span className="text-xs font-medium tabular-nums text-gray-600">
+            {selectedCount} من {cards.length} بطاقات لها فائز واحد
+          </span>
         </div>
+        <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
+          {cardRows.map(({ card, selection, saved, edited }) => {
+            const amountId = 'winner-amount-' + card.id;
+            const invalid = invalidCardId === card.id;
+            const legacy = saved.length > 1;
+            const pickerOpen = openPicker === card.id;
 
-        {cards.map((card) => (
-          <CardWinners
-            key={card.id}
-            card={card}
-            roundId={round.id}
-            rows={rows.filter((row) => row.cardId === card.id)}
-            disabled={busy}
-            onAdd={(purchaser) =>
-              setRows((previous) => [
-                ...previous,
-                {
-                  cardId: card.id,
-                  userId: purchaser.userId,
-                  userName: purchaser.userName,
-                  referralCode: purchaser.referralCode,
-                  amount: '',
-                },
-              ])
+            function select({ userId, userName, referralCode }: Omit<Selection, 'amount'>) {
+              const previous = saved.find((item) => item.userId === userId);
+              const amount = selection?.userId === userId
+                ? selection.amount
+                : previous ? String(previous.amount) : '';
+              update(card.id, { userId, userName, referralCode, amount });
+              setOpenPicker(null);
+              requestAnimationFrame(() => document.getElementById(amountId)?.focus());
             }
-            onChange={(userId, amount) =>
-              setRows((previous) =>
-                previous.map((row) => (row.cardId === card.id && row.userId === userId ? { ...row, amount } : row)),
-              )
-            }
-            onRemove={(userId) =>
-              setRows((previous) => previous.filter((row) => !(row.cardId === card.id && row.userId === userId)))
-            }
-          />
-        ))}
 
-        {rows.length ? (
-          <p className="text-sm font-medium text-gray-700">
-            إجمالي الجوائز: {formatIqd(rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0))}
+            return (
+              <section key={card.id} aria-labelledby={'winner-card-' + card.id} className="space-y-3 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 id={'winner-card-' + card.id} className="font-bold text-gray-900">{card.name}</h4>
+                  {legacy && !edited
+                    ? <Pill tone="amber">{saved.length} فائزين سابقين</Pill>
+                    : <Pill tone={selection ? 'green' : 'gray'}>{selection ? 'تم الاختيار' : 'بانتظار الاختيار'}</Pill>}
+                </div>
+
+                {legacy && !edited && (
+                  <details className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+                    <summary className="cursor-pointer text-xs font-semibold leading-6">عرض الفائزين السابقين</summary>
+                    <p className="mt-2 text-xs leading-5">
+                      لهذه البطاقة أكثر من فائز محفوظ. اختر واحدًا منهم أو ابحث عن فائز آخر لتحديث النتيجة.
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {saved.map((winner) => (
+                        <li key={winner.userId} className="flex flex-wrap items-center justify-between gap-2 py-1">
+                          <span className="min-w-0 break-words text-sm text-gray-900">
+                            {winner.userName || 'بدون اسم'} · {winner.amount.toLocaleString('en-US', { maximumFractionDigits: 20 })} د.ع
+                          </span>
+                          <button type="button" className={btn.small} disabled={busy} onClick={() => select(winner)}>
+                            اختيار {winner.userName || 'هذا الفائز'}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                  <div className="min-w-0">
+                    <p className="mb-1.5 text-xs font-medium text-gray-600">الفائز</p>
+                    <div className="flex min-h-11 flex-wrap items-center gap-2">
+                      {selection && (
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-sm font-semibold text-gray-900">{selection.userName || 'بدون اسم'}</p>
+                          {selection.referralCode && (
+                            <p className="text-xs text-gray-600">الإحالة <bdi>{selection.referralCode}</bdi></p>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className={selection ? btn.secondary : btn.primary}
+                        disabled={busy}
+                        aria-expanded={pickerOpen}
+                        aria-controls={pickerOpen ? 'winner-picker-' + card.id : undefined}
+                        aria-label={(pickerOpen ? 'إغلاق بحث ' : selection ? 'تغيير فائز ' : 'اختيار فائز ') + card.name}
+                        onClick={() => setOpenPicker(pickerOpen ? null : card.id)}
+                      >
+                        {pickerOpen ? 'إغلاق البحث' : selection ? 'تغيير' : 'اختيار فائز'}
+                      </button>
+                      {selection && !legacy && (
+                        <button
+                          type="button"
+                          className={btn.dangerGhost}
+                          disabled={busy}
+                          onClick={() => update(card.id, null)}
+                          aria-label={'إزالة فائز ' + card.name}
+                        >
+                          إزالة
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor={amountId} className="mb-1.5 block text-xs font-medium text-gray-600">الجائزة (د.ع)</label>
+                    <input
+                      id={amountId}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0"
+                      aria-label={'مبلغ جائزة ' + card.name + ' بالدينار العراقي'}
+                      aria-invalid={invalid}
+                      aria-describedby={invalid ? amountId + '-error' : undefined}
+                      value={selection?.amount ?? ''}
+                      disabled={busy || !selection}
+                      onChange={(event) => {
+                        if (selection) update(card.id, { ...selection, amount: event.target.value });
+                      }}
+                      className={inputClass + ' tabular-nums disabled:opacity-60'}
+                    />
+                    {invalid && (
+                      <p id={amountId + '-error'} role="alert" className="mt-1 text-xs leading-5 text-red-700">
+                        أدخل مبلغًا أكبر من صفر وحتى مليار دينار.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {legacy && edited && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <p>عند الحفظ، سيُعتمد هذا الفائز وحده لهذه البطاقة.</p>
+                    <button type="button" className={btn.small} disabled={busy} onClick={() => update(card.id, undefined)}>
+                      تراجع عن الاختيار
+                    </button>
+                  </div>
+                )}
+                {pickerOpen && (
+                  <WinnerPicker
+                    card={card}
+                    roundId={round.id}
+                    selectedId={selection?.userId}
+                    disabled={busy}
+                    onSelect={select}
+                  />
+                )}
+              </section>
+            );
+          })}
+          {!cards.length && <p className="p-4 text-sm text-gray-600">لا توجد بطاقات لهذه الجولة.</p>}
+        </div>
+        {total > 0 && (
+          <p className="text-sm text-gray-700">إجمالي الجوائز <bdi className="font-semibold">{formatIqd(total)}</bdi></p>
+        )}
+        <div className="grid items-end gap-2 rounded-xl bg-gray-50 p-4 sm:grid-cols-[10rem_1fr] sm:gap-4">
+          <label className="text-xs font-medium text-gray-700">
+            ظهور القائمة في التطبيق
+            <select
+              value={visibility}
+              disabled={busy}
+              onChange={(event) => {
+                const option = VISIBILITY.find((item) => item.value === event.target.value);
+                if (option) setVisibility(option.value);
+              }}
+              aria-describedby="winner-visibility-help"
+              className={inputClass + ' mt-1.5 bg-white'}
+            >
+              {VISIBILITY.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <p id="winner-visibility-help" className="pb-1.5 text-xs leading-5 text-gray-600">
+            {VISIBILITY.find((option) => option.value === visibility)?.help}
           </p>
-        ) : null}
+        </div>
       </div>
     </Modal>
-  );
-}
-
-function CardWinners({
-  card,
-  roundId,
-  rows,
-  disabled,
-  onAdd,
-  onChange,
-  onRemove,
-}: {
-  card: KhairCard;
-  roundId: string;
-  rows: Row[];
-  disabled: boolean;
-  onAdd: (purchaser: Purchaser) => void;
-  onChange: (userId: string, amount: string) => void;
-  onRemove: (userId: string) => void;
-}) {
-  const [purchasers, setPurchasers] = useState<Purchaser[] | null>(null);
-  const [loadError, setLoadError] = useState('');
-  const [pick, setPick] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    khairApi(`?purchasersRoundId=${encodeURIComponent(roundId)}&cardId=${encodeURIComponent(card.id)}`)
-      .then((result) => {
-        if (active) setPurchasers(result.purchasers as Purchaser[]);
-      })
-      .catch((e) => {
-        if (active) setLoadError(e instanceof Error ? e.message : 'فشل تحميل المشترين');
-      });
-    return () => {
-      active = false;
-    };
-  }, [roundId, card.id]);
-
-  const available = (purchasers ?? []).filter((p) => !rows.some((row) => row.userId === p.userId));
-
-  return (
-    <section className="rounded-xl border border-gray-200 p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h4 className="font-bold text-gray-900">{card.name}</h4>
-        <span className="text-xs text-gray-500">
-          {purchasers ? `${purchasers.length} مشترٍ في هذه الجولة` : 'جاري تحميل المشترين...'}
-        </span>
-      </div>
-
-      {rows.length === 0 ? <p className="mb-3 text-sm text-gray-500">لا يوجد فائزون لهذه البطاقة بعد.</p> : null}
-      <ul className="space-y-2">
-        {rows.map((row) => (
-          <li key={row.userId} className="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-gray-900">{row.userName || 'بدون اسم'}</p>
-              <p className="text-xs text-gray-500">رقم الإحالة: {row.referralCode || '—'}</p>
-            </div>
-            <input
-              type="number"
-              min="1"
-              step="any"
-              inputMode="decimal"
-              aria-label={`مبلغ فوز ${row.userName}`}
-              placeholder="المبلغ (د.ع)"
-              value={row.amount}
-              disabled={disabled}
-              onChange={(e) => onChange(row.userId, e.target.value)}
-              className={`${inputClass} !w-36`}
-            />
-            <button type="button" className={btn.dangerGhost} disabled={disabled} onClick={() => onRemove(row.userId)}>
-              حذف
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {loadError ? <p className="mt-3 text-sm text-red-600">{loadError}</p> : null}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select
-          className={`${inputClass} !w-auto min-w-[14rem] flex-1`}
-          value={pick}
-          disabled={disabled || !available.length}
-          onChange={(e) => setPick(e.target.value)}
-          aria-label={`اختر فائزاً لـ ${card.name}`}
-        >
-          <option value="">{available.length ? 'اختر فائزاً من المشترين...' : 'لا يوجد مشترون متبقون'}</option>
-          {available.map((p) => (
-            <option key={p.userId} value={p.userId}>
-              {p.userName || 'بدون اسم'} — {p.userPhone} — {p.chances} فرصة
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className={btn.small}
-          disabled={disabled || !pick}
-          onClick={() => {
-            const purchaser = available.find((p) => p.userId === pick);
-            if (purchaser) onAdd(purchaser);
-            setPick('');
-          }}
-        >
-          + إضافة فائز
-        </button>
-      </div>
-    </section>
   );
 }

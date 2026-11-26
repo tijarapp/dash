@@ -77,23 +77,27 @@ export async function GET(request: NextRequest) {
         .where('roundId', '==', roundId)
         .where('cardId', '==', cardId)
         .where('status', '==', 'active')
+        .select('userId', 'chances')
         .get();
       const chances = new Map<string, number>();
       for (const doc of rows.docs) {
         const userId = doc.get('userId');
-        if (typeof userId === 'string') chances.set(userId, (chances.get(userId) ?? 0) + (Number(doc.get('chances')) || 0));
+        if (validId(userId)) chances.set(userId, (chances.get(userId) ?? 0) + (Number(doc.get('chances')) || 0));
       }
-      const users = chances.size
-        ? await adminDb.getAll(...[...chances.keys()].map((id) => adminDb.doc(`users/${id}`)))
-        : [];
+      const userIds = [...chances.keys()];
+      const users = [];
+      for (let offset = 0; offset < userIds.length; offset += 250) {
+        const refs = userIds.slice(offset, offset + 250).map((id) => adminDb.doc(`users/${id}`));
+        users.push(...await adminDb.getAll(...refs, { fieldMask: ['name', 'phone', 'referralCode'] }));
+      }
       return NextResponse.json({
         purchasers: users
           .filter((doc) => doc.exists)
           .map((doc) => ({
             userId: doc.id,
-            userName: doc.get('name') ?? '',
-            userPhone: doc.get('phone') ?? '',
-            referralCode: doc.get('referralCode') ?? '',
+            userName: String(doc.get('name') ?? ''),
+            userPhone: String(doc.get('phone') ?? ''),
+            referralCode: String(doc.get('referralCode') ?? ''),
             chances: chances.get(doc.id) ?? 0,
           })),
       });
@@ -187,49 +191,58 @@ export async function POST(request: NextRequest) {
         }, { merge: true });
       });
     } else if (body.action === 'saveWinners') {
-      const { roundId, visibility, winners } = body;
+      const { roundId, visibility, winnerChanges } = body;
       if (!validId(roundId)) throw new Error('معرّف الجولة غير صالح');
       if (!['auto', 'shown', 'hidden'].includes(visibility)) throw new Error('خيار الإظهار غير صالح');
-      if (!Array.isArray(winners) || winners.length > 500) throw new Error('قائمة الفائزين غير صالحة');
-      const seen = new Set<string>();
-      for (const winner of winners) {
-        if (!KHAIR_CARDS.some((card) => card.id === winner?.cardId)) throw new Error('نوع البطاقة غير صالح');
-        if (!validId(winner.userId)) throw new Error('معرّف المستخدم غير صالح');
-        if (typeof winner.amount !== 'number' || !Number.isFinite(winner.amount) || winner.amount <= 0 || winner.amount > 1_000_000_000)
-          throw new Error('مبلغ الفوز يجب أن يكون رقماً موجباً');
-        const key = `${winner.cardId}:${winner.userId}`;
-        if (seen.has(key)) throw new Error('لا يمكن تكرار نفس الفائز في نفس البطاقة');
-        seen.add(key);
+      if (!Array.isArray(winnerChanges)) throw new Error('قائمة الفائزين غير صالحة');
+      const changes = new Map<string, { userId: string; amount: number } | null>();
+      for (const change of winnerChanges) {
+        if (!KHAIR_CARDS.some((card) => card.id === change?.cardId)) throw new Error('نوع البطاقة غير صالح');
+        if (changes.has(change.cardId)) throw new Error('يمكن اختيار فائز واحد فقط لكل بطاقة');
+        if (change.userId === null) {
+          changes.set(change.cardId, null);
+          continue;
+        }
+        if (!validId(change.userId)) throw new Error('معرّف المستخدم غير صالح');
+        if (typeof change.amount !== 'number' || !Number.isFinite(change.amount) || change.amount <= 0 || change.amount > 1_000_000_000)
+          throw new Error('مبلغ الفوز يجب أن يكون أكبر من صفر وحتى مليار دينار');
+        changes.set(change.cardId, { userId: change.userId, amount: change.amount });
       }
       const roundRef = adminDb.doc(`khairRounds/${roundId}`);
-      const round = await roundRef.get();
-      if (!round.exists) throw new Error('الجولة غير موجودة');
-      // Each winner must hold an active card of that type in this round.
-      const userIds = [...new Set(winners.map((w: { userId: string }) => w.userId))];
-      const [userDocs, purchaseDocs] = await Promise.all([
-        userIds.length ? adminDb.getAll(...userIds.map((id) => adminDb.doc(`users/${id}`))) : [],
-        adminDb.collection('khairPurchases').where('roundId', '==', roundId).where('status', '==', 'active').get(),
-      ]);
-      const bought = new Set(purchaseDocs.docs.map((doc) => `${doc.get('cardId')}:${doc.get('userId')}`));
-      const users = new Map(userDocs.map((doc) => [doc.id, doc]));
-      const cardNames = new Map<string, string>();
-      for (const doc of await adminDb.getAll(...KHAIR_CARDS.map((card) => adminDb.doc(`khairCards/${card.id}`))))
-        cardNames.set(doc.id, doc.get('name') ?? KHAIR_CARDS.find((card) => card.id === doc.id)!.name);
-      const saved = winners.map((winner: { cardId: string; userId: string; amount: number }) => {
-        const user = users.get(winner.userId);
-        if (!user?.exists) throw new Error('أحد الفائزين غير موجود');
-        if (!bought.has(`${winner.cardId}:${winner.userId}`))
-          throw new Error(`«${user.get('name') ?? ''}» لم يشترِ هذه البطاقة في هذه الجولة`);
-        return {
-          cardId: winner.cardId,
-          cardName: cardNames.get(winner.cardId) ?? '',
-          userId: winner.userId,
-          userName: user.get('name') ?? '',
-          referralCode: user.get('referralCode') ?? '',
-          amount: winner.amount,
-        };
+      await adminDb.runTransaction(async (tx) => {
+        const round = await tx.get(roundRef);
+        if (!round.exists) throw new Error('الجولة غير موجودة');
+        const winners = (round.get('winners') ?? []) as { cardId: string }[];
+        const saved = winners.filter((winner) => !changes.has(winner.cardId));
+        for (const [cardId, winner] of changes) {
+          if (!winner) continue;
+          const [user, card, purchases] = await Promise.all([
+            tx.get(adminDb.doc(`users/${winner.userId}`)),
+            tx.get(adminDb.doc(`khairCards/${cardId}`)),
+            tx.get(adminDb.collection('khairPurchases')
+              .where('roundId', '==', roundId)
+              .where('cardId', '==', cardId)
+              .where('userId', '==', winner.userId)
+              .where('status', '==', 'active')
+              .limit(1)),
+          ]);
+          if (!user.exists) throw new Error('أحد الفائزين غير موجود');
+          if (purchases.empty) throw new Error(`«${user.get('name') ?? ''}» ليس لديه شراء فعّال لهذه البطاقة في هذه الجولة`);
+          const record = {
+            ...winner,
+            cardId,
+            cardName: card.get('name') ?? KHAIR_CARDS.find((item) => item.id === cardId)!.name,
+            userName: user.get('name') ?? '',
+            referralCode: user.get('referralCode') ?? '',
+          };
+          saved.push(record);
+        }
+        tx.update(roundRef, {
+          winners: saved,
+          winnersVisibility: visibility,
+          winnersUpdatedAt: FieldValue.serverTimestamp(),
+        });
       });
-      await roundRef.update({ winners: saved, winnersVisibility: visibility, winnersUpdatedAt: FieldValue.serverTimestamp() });
     } else if (body.action === 'settings') {
       const { supportWhatsapp = '', referralBonus = 50 } = body;
       if (typeof referralBonus !== 'number' || !Number.isFinite(referralBonus) || referralBonus < 0 || referralBonus > 1_000_000)
