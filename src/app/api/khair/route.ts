@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { KHAIR_CARDS } from '@/lib/khairCards';
 import type { KhairWinner } from '@/components/khair/shared';
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue, Timestamp, type Query } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, type DocumentReference, type Query } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { getAdminUser } from '@/lib/session';
 import { DEMO_MODE } from '@/lib/demo';
@@ -27,6 +27,7 @@ function validId(value: unknown): value is string {
   );
 }
 type StoredWinner = Omit<KhairWinner, 'paidAt'> & { paidAt?: Timestamp };
+const MAX_ROUND_WINNERS = 500;
 
 function validPrizeAmount(amount: unknown): amount is number {
   return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 && amount <= 1_000_000_000;
@@ -206,12 +207,19 @@ export async function POST(request: NextRequest) {
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       });
-    } else if (body.action === 'saveWinners') {
-      const { roundId, visibility, winnerChanges } = body;
+    } else if (['saveAndPayWinners', 'saveWinners', 'payWinner'].includes(body.action)) {
+      const { roundId } = body;
+      const singlePayout = body.action === 'payWinner';
+      const payPrizes = body.action !== 'saveWinners';
+      const visibility = singlePayout ? undefined : body.visibility;
+      const winnerChanges = singlePayout ? [body] : body.winnerChanges;
       if (!validId(roundId)) throw new Error('معرّف الجولة غير صالح');
-      if (!['auto', 'shown', 'hidden'].includes(visibility)) throw new Error('خيار الإظهار غير صالح');
-      if (!Array.isArray(winnerChanges) || winnerChanges.length > 500) throw new Error('قائمة الفائزين غير صالحة');
-      const changes = new Map<string, { cardId: string; userId: string; amount: number | null }>();
+      if ((!payPrizes || visibility !== undefined) && !['auto', 'shown', 'hidden'].includes(visibility))
+        throw new Error('خيار الإظهار غير صالح');
+      if (singlePayout && !validPrizeAmount(body.amount)) throw new Error('مبلغ الجائزة غير صالح');
+      const maxChanges = body.action === 'saveAndPayWinners' ? 2 * MAX_ROUND_WINNERS : MAX_ROUND_WINNERS;
+      if (!Array.isArray(winnerChanges) || winnerChanges.length > maxChanges) throw new Error('قائمة الفائزين غير صالحة');
+      const changes = new Map<string, { card: (typeof KHAIR_CARDS)[number]; userId: string; amount: number | null }>();
       for (const change of winnerChanges) {
         const card = KHAIR_CARDS.find((item) => item.id === change?.cardId);
         if (!card) throw new Error('نوع البطاقة غير صالح');
@@ -220,7 +228,7 @@ export async function POST(request: NextRequest) {
           throw new Error('مبلغ الفوز يجب أن يكون أكبر من صفر وحتى مليار دينار');
         const key = card.id + '/' + change.userId;
         if (changes.has(key)) throw new Error('لا يمكن تكرار نفس الفائز في البطاقة');
-        changes.set(key, { cardId: card.id, userId: change.userId, amount: change.amount });
+        changes.set(key, { card, userId: change.userId, amount: change.amount });
       }
       const roundRef = adminDb.doc(`khairRounds/${roundId}`);
       await adminDb.runTransaction(async (tx) => {
@@ -228,88 +236,93 @@ export async function POST(request: NextRequest) {
         if (!round.exists) throw new Error('الجولة غير موجودة');
         const winners = (round.get('winners') ?? []) as StoredWinner[];
         const saved = new Map(winners.map((winner) => [winner.cardId + '/' + winner.userId, winner]));
-        for (const [key, change] of changes) {
+        const pending = [];
+        const references = new Map<string, DocumentReference>();
+        for (const [key, { card, userId, amount }] of changes) {
           const current = saved.get(key);
-          if (current?.amount === change.amount) continue;
-          if (current?.paidAt) throw new Error('لا يمكن تعديل جائزة مصروفة أو إزالة الفائز بها');
-          if (change.amount === null) saved.delete(key);
+          if (singlePayout && current?.amount !== amount)
+            throw new Error('تغيّر المبلغ أو الفائز. أعد تحميل الجولة وتحقّق من الجائزة.');
+          if (current?.paidAt) {
+            if (current.amount !== amount) throw new Error('لا يمكن تعديل جائزة مصروفة أو إزالة الفائز بها');
+            continue;
+          }
+          if (amount === null) {
+            saved.delete(key);
+            continue;
+          }
+          if (!payPrizes && current?.amount === amount) continue;
+
+          const userRef = adminDb.doc(`users/${userId}`);
+          const cardRef = adminDb.doc(`khairCards/${card.id}`);
+          const payoutRef = payPrizes
+            ? roundRef.collection('prizePayouts').doc(
+              createHash('sha256').update(JSON.stringify([card.id, userId])).digest('hex'),
+            )
+            : null;
+          references.set(userRef.path, userRef);
+          references.set(cardRef.path, cardRef);
+          if (payoutRef) references.set(payoutRef.path, payoutRef);
+          pending.push({ key, card, amount, current, userRef, cardRef, payoutRef });
         }
-        for (const [key, { cardId, userId, amount }] of changes) {
-          if (amount === null || saved.get(key)?.amount === amount) continue;
-          const [user, card, purchases] = await Promise.all([
-            tx.get(adminDb.doc(`users/${userId}`)),
-            tx.get(adminDb.doc(`khairCards/${cardId}`)),
-            tx.get(activeWinnerPurchase(roundId, cardId, userId)),
-          ]);
+        if (singlePayout && pending.length === 0) return;
+        if (!singlePayout && saved.size + pending.filter(({ current }) => !current).length > MAX_ROUND_WINNERS)
+          throw new Error(`الحد الأقصى ${MAX_ROUND_WINNERS} فائز في الجولة`);
+
+        const [snapshots, purchases] = await Promise.all([
+          references.size ? tx.getAll(...references.values()) : [],
+          Promise.all(pending.map(({ card, userRef }) =>
+            tx.get(activeWinnerPurchase(roundId, card.id, userRef.id)),
+          )),
+        ]);
+        const documents = new Map(snapshots.map((snapshot) => [snapshot.ref.path, snapshot]));
+        const wallets = new Map<string, { goldBalance: number; dinarBalance: number }>();
+        const paidAt = Timestamp.now();
+        const label = 'جائزة بصمة خير';
+        for (const [index, { key, card, amount, current, userRef, cardRef, payoutRef }] of pending.entries()) {
+          const user = documents.get(userRef.path)!;
+          if (payoutRef && documents.get(payoutRef.path)?.exists) throw new Error('سبق صرف هذه الجائزة');
           if (!user.exists) throw new Error('أحد الفائزين غير موجود');
-          if (purchases.empty) throw new Error(`«${user.get('name') ?? ''}» ليس لديه شراء فعّال لهذه البطاقة في هذه الجولة`);
-          saved.set(key, {
-            cardId,
-            cardName: card.get('name') ?? KHAIR_CARDS.find((item) => item.id === cardId)!.name,
-            userId,
+          if (purchases[index].empty) throw new Error(`«${user.get('name') ?? ''}» ليس لديه شراء فعّال لهذه البطاقة في هذه الجولة`);
+
+          const cardId = card.id;
+          const userId = userRef.id;
+          const winner: StoredWinner = current?.amount === amount ? current : {
+            cardId, userId, amount,
+            cardName: documents.get(cardRef.path)?.get('name') ?? card.name,
             userName: user.get('name') ?? '',
             referralCode: user.get('referralCode') ?? '',
-            amount,
-          });
+          };
+          if (payoutRef) {
+            const wallet = wallets.get(userRef.path) ?? {
+              goldBalance: Number(user.get('goldBalance')) || 0,
+              dinarBalance: Number(user.get('dinarBalance')) || 0,
+            };
+            wallet.goldBalance += amount;
+            wallet.dinarBalance += amount;
+            wallets.set(userRef.path, wallet);
+
+            const transactionRef = adminDb.collection('transactions').doc();
+            tx.create(transactionRef, {
+              userId, roundId, cardId, type: 'charge', status: 'completed',
+              chargeReason: 'khair_prize', chargeReasonLabel: label,
+              note: `${label} · ${winner.cardName} · ${round.get('title') ?? ''}`,
+              goldAmount: amount, dinarAmount: amount, createdAt: FieldValue.serverTimestamp(),
+            });
+            tx.create(adminDb.collection('notifications').doc(), {
+              userId, title: label,
+              body: `أُضيفت جائزتك البالغة ${amount.toLocaleString('ar-IQ', { maximumFractionDigits: 20 })} دينار عراقي إلى محفظتك عن «${winner.cardName}».`,
+              read: false, createdAt: FieldValue.serverTimestamp(),
+            });
+            tx.create(payoutRef, { cardId, userId, amount, paidBy: admin.uid, transactionId: transactionRef.id, paidAt });
+          }
+          saved.set(key, payoutRef ? { ...winner, paidAt } : winner);
         }
-        if (saved.size > 500) throw new Error('الحد الأقصى 500 فائز في الجولة');
+        for (const [path, wallet] of wallets) tx.update(adminDb.doc(path), wallet);
         tx.update(roundRef, {
           winners: [...saved.values()],
-          winnersVisibility: visibility,
-          winnersUpdatedAt: FieldValue.serverTimestamp(),
-        });
-      });
-    } else if (body.action === 'payWinner') {
-      const { roundId, cardId, userId, amount } = body;
-      if (!validId(roundId) || !validId(userId) || !KHAIR_CARDS.some((card) => card.id === cardId))
-        throw new Error('بيانات الفائز غير صالحة');
-      if (!validPrizeAmount(amount)) throw new Error('مبلغ الجائزة غير صالح');
-
-      const roundRef = adminDb.doc(`khairRounds/${roundId}`);
-      const userRef = adminDb.doc(`users/${userId}`);
-      const payoutId = createHash('sha256').update(JSON.stringify([cardId, userId])).digest('hex');
-      const payoutRef = roundRef.collection('prizePayouts').doc(payoutId);
-      const transactionRef = adminDb.collection('transactions').doc();
-      const notificationRef = adminDb.collection('notifications').doc();
-
-      await adminDb.runTransaction(async (tx) => {
-        const round = await tx.get(roundRef);
-        if (!round.exists) throw new Error('الجولة غير موجودة');
-        const winners = (round.get('winners') ?? []) as StoredWinner[];
-        const winner = winners.find((item) => item.cardId === cardId && item.userId === userId);
-        if (!winner || winner.amount !== amount)
-          throw new Error('تغيّر المبلغ أو الفائز. أعد تحميل الجولة وتحقّق من الجائزة.');
-        if (winner.paidAt) return;
-
-        const [payout, user, purchases] = await Promise.all([
-          tx.get(payoutRef),
-          tx.get(userRef),
-          tx.get(activeWinnerPurchase(roundId, cardId, userId)),
-        ]);
-        if (payout.exists) throw new Error('سبق صرف هذه الجائزة');
-        if (!user.exists) throw new Error('المستخدم غير موجود');
-        if (purchases.empty) throw new Error('ليس لدى الفائز شراء فعّال لهذه البطاقة في هذه الجولة');
-
-        const label = 'جائزة بصمة خير';
-        const note = `${label} · ${winner.cardName} · ${round.get('title') ?? ''}`;
-        const paidAt = Timestamp.now();
-        tx.update(userRef, {
-          goldBalance: (Number(user.get('goldBalance')) || 0) + amount,
-          dinarBalance: (Number(user.get('dinarBalance')) || 0) + amount,
-        });
-        tx.create(transactionRef, {
-          userId, roundId, cardId, type: 'charge', status: 'completed',
-          chargeReason: 'khair_prize', chargeReasonLabel: label, note,
-          goldAmount: amount, dinarAmount: amount, createdAt: FieldValue.serverTimestamp(),
-        });
-        tx.create(notificationRef, {
-          userId, title: label,
-          body: `أُضيفت جائزتك البالغة ${amount.toLocaleString('ar-IQ', { maximumFractionDigits: 20 })} دينار عراقي إلى محفظتك عن «${winner.cardName}».`,
-          read: false, createdAt: FieldValue.serverTimestamp(),
-        });
-        tx.create(payoutRef, { cardId, userId, amount, paidBy: admin.uid, transactionId: transactionRef.id, paidAt });
-        tx.update(roundRef, {
-          winners: winners.map((item) => item === winner ? { ...item, paidAt } : item),
+          ...(!singlePayout ? {
+            winnersVisibility: visibility ?? round.get('winnersVisibility') ?? 'auto',
+          } : {}),
           winnersUpdatedAt: FieldValue.serverTimestamp(),
         });
       });

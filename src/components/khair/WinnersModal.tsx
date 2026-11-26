@@ -56,9 +56,8 @@ export default function WinnersModal({
   const [openPicker, setOpenPicker] = useState<string | null>(null);
   const [visibilityDraft, setVisibility] = useState<KhairRound['winnersVisibility']>();
   const [invalidKey, setInvalidKey] = useState<string | null>(null);
-  const [confirmKey, setConfirmKey] = useState<string | null>(null);
-  const [justPaid, setJustPaid] = useState<ReadonlySet<string>>(new Set());
   const visibility = visibilityDraft ?? round.winnersVisibility ?? 'auto';
+  const visibilityChanged = visibility !== (round.winnersVisibility ?? 'auto');
   const saved = new Map((round.winners ?? []).map((winner) => [winnerKey(winner.cardId, winner.userId), winner]));
   const cardRows = cards.map((card) => {
     const rows = new Map<string, Selection>();
@@ -72,6 +71,16 @@ export default function WinnersModal({
     }
     return { card, rows: [...rows.values()] };
   });
+  const pendingWinners = cardRows.flatMap(({ card, rows }) =>
+    rows.filter((row) => !row.paidAt).map(({ userId, amount }) => ({ cardId: card.id, userId, amount })),
+  );
+  const removals = Object.values(edits).filter(({ cardId, userId, selection }) => {
+    const original = saved.get(winnerKey(cardId, userId));
+    return !selection && original && !original.paidAt;
+  });
+  const hasPrizesToPay = pendingWinners.length > 0;
+  const saveLabel = hasPrizesToPay ? 'حفظ وصرف الجوائز' : 'حفظ الفائزين';
+  const savingLabel = hasPrizesToPay ? 'جارٍ الحفظ والصرف…' : 'جارٍ الحفظ…';
   const selectedCount = cardRows.reduce((count, { rows }) => count + rows.length, 0);
   const total = cardRows.reduce((sum, { rows }) => sum + rows.reduce((subtotal, row) => {
     const amount = readAmount(row.amount);
@@ -82,30 +91,29 @@ export default function WinnersModal({
     const key = winnerKey(cardId, userId);
     setEdits((previous) => ({ ...previous, [key]: { cardId, userId, selection } }));
     if (invalidKey === key) setInvalidKey(null);
-    if (confirmKey === key) setConfirmKey(null);
   }
 
   async function save() {
-    const winnerChanges: { cardId: string; userId: string; amount: number | null }[] = [];
-    for (const [key, { cardId, userId, selection }] of Object.entries(edits)) {
-      const original = saved.get(key);
-      if (!selection) {
-        if (original) winnerChanges.push({ cardId, userId, amount: null });
-        continue;
-      }
-      const amount = readAmount(selection.amount);
+    const winnerChanges: { cardId: string; userId: string; amount: number | null }[] = removals.map(
+      ({ cardId, userId }) => ({ cardId, userId, amount: null }),
+    );
+    for (const { cardId, userId, amount: value } of pendingWinners) {
+      const amount = readAmount(value);
       if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000) {
+        const key = winnerKey(cardId, userId);
         setInvalidKey(key);
         document.getElementById(amountId(key))?.focus();
         return;
       }
-      if (original?.amount !== amount) winnerChanges.push({ cardId, userId, amount });
+      winnerChanges.push({ cardId, userId, amount });
     }
     setInvalidKey(null);
-    setConfirmKey(null);
     const ok = await run(
-      () => khairApi('', { action: 'saveWinners', roundId: round.id, visibility, winnerChanges }),
-      'تم حفظ الفائزين',
+      () => khairApi('', {
+        action: 'saveAndPayWinners', roundId: round.id, winnerChanges,
+        ...(visibilityChanged ? { visibility } : {}),
+      }),
+      hasPrizesToPay ? 'تم حفظ الفائزين وصرف الجوائز' : 'تم حفظ الفائزين',
     );
     if (ok) {
       setEdits({});
@@ -114,24 +122,11 @@ export default function WinnersModal({
     }
   }
 
-  async function pay(winner: KhairWinner, key: string) {
-    const ok = await run(
-      () => khairApi('', {
-        action: 'payWinner', roundId: round.id, cardId: winner.cardId, userId: winner.userId, amount: winner.amount,
-      }),
-      'تم إيداع الجائزة في المحفظة',
-    );
-    if (ok) {
-      setJustPaid((previous) => new Set(previous).add(key));
-      setConfirmKey(null);
-    }
-  }
-
   return (
     <Modal
       open
       title={'فائزو «' + round.title + '»'}
-      description="اختر فائزًا واحدًا أو أكثر لكل بطاقة. احفظ المبالغ أولًا، ثم اصرف كل جائزة إلى محفظة الفائز."
+      description="حدّد الفائزين ومبالغ الجوائز. تُصرف الجوائز المعلّقة إلى محافظ الفائزين عند الحفظ."
       onClose={onClose}
       closeDisabled={busy}
       footer={
@@ -141,9 +136,9 @@ export default function WinnersModal({
             type="button"
             className={btn.primary}
             onClick={save}
-            disabled={busy || (visibility === (round.winnersVisibility ?? 'auto') && Object.keys(edits).length === 0)}
+            disabled={busy || (!hasPrizesToPay && !visibilityChanged && removals.length === 0)}
           >
-            حفظ الفائزين
+            {busy ? savingLabel : saveLabel}
           </button>
         </>
       }
@@ -170,10 +165,7 @@ export default function WinnersModal({
                     aria-expanded={pickerOpen}
                     aria-controls={pickerOpen ? 'winner-picker-' + card.id : undefined}
                     aria-label={(pickerOpen ? 'إغلاق بحث ' : 'إضافة فائز إلى ') + card.name}
-                    onClick={() => {
-                      setConfirmKey(null);
-                      setOpenPicker(pickerOpen ? null : card.id);
-                    }}
+                    onClick={() => setOpenPicker(pickerOpen ? null : card.id)}
                   >
                     {pickerOpen ? 'إغلاق البحث' : 'إضافة فائز'}
                   </button>
@@ -200,10 +192,7 @@ export default function WinnersModal({
                   <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
                     {rows.map((row) => {
                       const key = winnerKey(card.id, row.userId);
-                      const winner = saved.get(key);
-                      const paid = Boolean(row.paidAt) || justPaid.has(key);
                       const name = row.userName || 'بدون اسم';
-                      const canPay = winner && winner.amount === readAmount(row.amount) && !paid;
                       return (
                         <li key={key} className="space-y-2 p-3">
                           <div className="grid items-center gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
@@ -213,7 +202,7 @@ export default function WinnersModal({
                                 <p className="text-xs text-gray-600">الإحالة <bdi>{row.referralCode}</bdi></p>
                               )}
                             </div>
-                            {paid ? (
+                            {row.paidAt ? (
                               <bdi className="text-sm font-semibold tabular-nums text-gray-900">{prizeLabel(readAmount(row.amount))}</bdi>
                             ) : (
                               <div>
@@ -233,32 +222,17 @@ export default function WinnersModal({
                                 />
                               </div>
                             )}
-                            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                              {paid ? <Pill tone="green">تم الصرف</Pill> : (
-                                <>
-                                  {canPay ? (
-                                    <button
-                                      type="button"
-                                      className={btn.secondary}
-                                      disabled={busy || confirmKey === key}
-                                      onClick={() => {
-                                        setOpenPicker(null);
-                                        setConfirmKey(key);
-                                      }}
-                                    >
-                                      صرف الجائزة
-                                    </button>
-                                  ) : <Pill tone="gray">بانتظار الحفظ</Pill>}
-                                  <button
-                                    type="button"
-                                    className={btn.dangerGhost}
-                                    disabled={busy}
-                                    aria-label={'إزالة ' + name + ' من ' + card.name}
-                                    onClick={() => update(card.id, row.userId, null)}
-                                  >
-                                    إزالة
-                                  </button>
-                                </>
+                            <div className="flex sm:justify-end">
+                              {row.paidAt ? <Pill tone="green">تم الصرف</Pill> : (
+                                <button
+                                  type="button"
+                                  className={btn.dangerGhost}
+                                  disabled={busy}
+                                  aria-label={'إزالة ' + name + ' من ' + card.name}
+                                  onClick={() => update(card.id, row.userId, null)}
+                                >
+                                  إزالة
+                                </button>
                               )}
                             </div>
                           </div>
@@ -266,19 +240,6 @@ export default function WinnersModal({
                             <p id={amountId(key) + '-error'} role="alert" className="text-xs text-red-700">
                               أدخل مبلغًا أكبر من صفر وحتى مليار دينار.
                             </p>
-                          )}
-                          {confirmKey === key && canPay && (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 p-3">
-                              <p className="text-sm text-amber-900">
-                                إيداع <bdi>{prizeLabel(winner.amount)}</bdi> في محفظة «{name}»؟
-                              </p>
-                              <div className="flex gap-2">
-                                <button type="button" className={btn.small} disabled={busy} onClick={() => setConfirmKey(null)}>إلغاء</button>
-                                <button type="button" className={btn.primary} disabled={busy} onClick={() => void pay(winner, key)}>
-                                  {busy ? 'جارٍ الصرف…' : 'تأكيد الصرف'}
-                                </button>
-                              </div>
-                            </div>
                           )}
                         </li>
                       );
