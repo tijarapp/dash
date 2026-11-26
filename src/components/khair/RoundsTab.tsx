@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import FormField, { inputClass } from '@/components/ui/FormField';
 import ImageListUploadField from '@/components/ui/ImageListUploadField';
 import Modal from '@/components/ui/Modal';
+import WinnersModal from './WinnersModal';
 import {
   allowedRoundStatuses,
   btn,
@@ -65,6 +66,7 @@ export default function RoundsTab({
 }) {
   const [editing, setEditing] = useState<KhairRound | 'new' | null>(null);
   const [reopening, setReopening] = useState(false);
+  const [winnersFor, setWinnersFor] = useState<KhairRound | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const currentId = data.settings.currentRoundId;
   const activeRound = data.rounds.find((r) => r.status === 'active');
@@ -173,6 +175,20 @@ export default function RoundsTab({
                     >
                       👥 عرض المشترين في هذه الجولة ←
                     </button>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button type="button" className={btn.small} disabled={busy} onClick={() => { clearNotice(); setWinnersFor(round); }}>
+                        🏆 الفائزون{round.winners?.length ? ` (${round.winners.length})` : ''}
+                      </button>
+                      {round.winners?.length ? (
+                        <Pill tone={round.winnersVisibility === 'hidden' ? 'gray' : round.winnersVisibility === 'shown' ? 'green' : 'blue'}>
+                          {round.winnersVisibility === 'hidden'
+                            ? 'القائمة مخفية'
+                            : round.winnersVisibility === 'shown'
+                              ? 'القائمة ظاهرة'
+                              : 'تظهر عند نهاية الجولة'}
+                        </Pill>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="flex shrink-0 flex-col gap-3 lg:items-end">
@@ -249,6 +265,17 @@ export default function RoundsTab({
           })}
         </ul>
       )}
+
+      {winnersFor ? (
+        <WinnersModal
+          round={winnersFor}
+          cards={data.cards.filter((card) => card.isActive)}
+          busy={busy}
+          run={run}
+          error={error}
+          onClose={() => setWinnersFor(null)}
+        />
+      ) : null}
 
       {editing ? (
         <RoundForm

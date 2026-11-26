@@ -30,6 +30,7 @@ const typeLabels: Record<string, string> = {
   withdraw: 'سحب',
   profit: 'ربح',
   monthly_payout: 'دفعة شهرية (رأس مال وربح)',
+  referral_bonus: 'مكافأة دعوة صديق',
   invest: 'استثمار',
   ...khairTransactionLabels,
 };
@@ -385,7 +386,7 @@ export default function DashboardTables({
                 {categoriesPage.pageItems.map((cat) => (
                   <tr key={cat.id} className="border-t">
                     <td className="p-3 font-medium">{cat.title}</td>
-                    <td className="p-3">{cat.payoutModel && cat.profitPercent !== undefined ? `${cat.profitPercent}% لكامل المدة` : 'تحتاج إعداد شهري'}</td>
+                    <td className="p-3">{cat.isFree ? `${cat.monthlyReturn ?? 0} د.ع شهرياً (مجاني)` : cat.payoutModel && cat.profitPercent !== undefined ? `${cat.profitPercent}% لكامل المدة` : 'تحتاج إعداد شهري'}</td>
                     <td className="p-3">{cat.count}</td>
                     <td className="p-3">{cat.total > 0 ? cat.total.toLocaleString() : '—'}</td>
                     <td className="p-3">

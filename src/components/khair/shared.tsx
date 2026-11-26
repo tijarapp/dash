@@ -26,6 +26,18 @@ export type KhairRound = {
   totalPurchases: number;
   totalChances: number;
   totalAmount: number;
+  /** Prize winners; the app lists them per card once visible. */
+  winners?: KhairWinner[];
+  /** auto = shown once the round ends, shown = always, hidden = never. */
+  winnersVisibility?: 'auto' | 'shown' | 'hidden';
+};
+export type KhairWinner = {
+  cardId: string;
+  cardName: string;
+  userId: string;
+  userName: string;
+  referralCode: string;
+  amount: number;
 };
 export type KhairPurchase = {
   id: string;
@@ -47,6 +59,8 @@ export type KhairSettings = {
   defaultBannerUrl?: string;
   defaultBannerUrls?: string[];
   supportWhatsapp?: string;
+  /** Paid to the inviter each time an invited user buys a card (default 50). */
+  referralBonus?: number;
 };
 export type KhairData = {
   cards: KhairCard[];

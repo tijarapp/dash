@@ -31,7 +31,7 @@ export default function SettingsTab({
 
   return (
     <form
-      key={JSON.stringify([data.settings.defaultBannerUrls, data.settings.defaultBannerUrl, data.settings.supportWhatsapp])}
+      key={JSON.stringify([data.settings.defaultBannerUrls, data.settings.defaultBannerUrl, data.settings.supportWhatsapp, data.settings.referralBonus])}
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
@@ -44,6 +44,7 @@ export default function SettingsTab({
                 .getAll('defaultBannerUrls')
                 .filter((url) => typeof url === 'string' && url.trim()),
               supportWhatsapp: String(f.get('supportWhatsapp') ?? '').trim(),
+              referralBonus: Number(f.get('referralBonus') ?? 50),
             }),
           'تم حفظ الإعدادات',
         );
@@ -93,6 +94,19 @@ export default function SettingsTab({
               className={`${inputClass} text-right`}
               defaultValue={data.settings.supportWhatsapp}
               placeholder="9647XXXXXXXXX"
+            />
+          </FormField>
+        </div>
+
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <FormField label="مكافأة الدعوة (د.ع)" hint="كل مرة يشتري فيها شخص دخل برمز إحالة بطاقة بصمة خير، يربح صاحب رمز الإحالة هذا المبلغ في محفظته. اكتب 0 لإيقاف المكافأة.">
+            <input
+              name="referralBonus"
+              type="number"
+              min="0"
+              step="1"
+              className={inputClass}
+              defaultValue={data.settings.referralBonus ?? 50}
             />
           </FormField>
         </div>

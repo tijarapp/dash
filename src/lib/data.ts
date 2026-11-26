@@ -30,7 +30,12 @@ export interface CategoryRow {
   description: string;
   imageUrl: string;
   dailyProfitRate: number;
-  payoutModel?: 'monthly_capital_and_profit';
+  payoutModel?: 'monthly_capital_and_profit' | 'free_monthly_return';
+  /** Free trial investment: costs nothing and pays a fixed amount every month. */
+  isFree?: boolean;
+  monthlyReturn?: number;
+  /** Number of subscriptions (active or finished); a category with any cannot be deleted. */
+  investorCount?: number;
   /** Profit for the whole duration as a percentage of capital (1–100). */
   profitPercent?: number;
   expectedTotalReturn?: number;
@@ -168,26 +173,36 @@ export async function getOverviewStats() {
   };
 }
 
+const PAYOUT_MODELS = ['monthly_capital_and_profit', 'free_monthly_return'] as const;
+
+function categoryFromDoc(id: string, d: FirebaseFirestore.DocumentData): CategoryRow {
+  const payoutModel = PAYOUT_MODELS.find((model) => model === d.payoutModel);
+  const isFree = payoutModel === 'free_monthly_return';
+  return {
+    id,
+    title: d.title ?? '',
+    description: d.description ?? '',
+    imageUrl: d.imageUrl ?? '',
+    dailyProfitRate: Number(d.dailyProfitRate) || 0,
+    payoutModel,
+    isFree,
+    monthlyReturn: isFree ? Number(d.monthlyReturn) || 0 : undefined,
+    profitPercent: typeof d.profitPercent === 'number' ? d.profitPercent : undefined,
+    expectedTotalReturn: payoutModel ? Number(d.expectedTotalReturn) : undefined,
+    minInvestment: Number(d.minInvestment) || 0,
+    durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
+    isActive: Boolean(d.isActive),
+  };
+}
+
 export async function listCategories(): Promise<CategoryRow[]> {
   if (DEMO_MODE) return demoCategories;
 
   const snap = await adminDb.collection('investmentCategories').get();
-  return snap.docs.map((doc) => {
-    const d = doc.data();
-    return {
-      id: doc.id,
-      title: d.title ?? '',
-      description: d.description ?? '',
-      imageUrl: d.imageUrl ?? '',
-      dailyProfitRate: Number(d.dailyProfitRate) || 0,
-      payoutModel: d.payoutModel === 'monthly_capital_and_profit' ? d.payoutModel : undefined,
-      profitPercent: typeof d.profitPercent === 'number' ? d.profitPercent : undefined,
-      expectedTotalReturn: d.payoutModel === 'monthly_capital_and_profit' ? Number(d.expectedTotalReturn) : undefined,
-      minInvestment: Number(d.minInvestment) || 0,
-      durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
-      isActive: Boolean(d.isActive),
-    };
-  });
+  return Promise.all(snap.docs.map(async (doc) => {
+    const counted = await adminDb.collection('investments').where('categoryId', '==', doc.id).count().get();
+    return { ...categoryFromDoc(doc.id, doc.data()), investorCount: counted.data().count };
+  }));
 }
 
 export async function getCategoryById(id: string): Promise<CategoryRow | null> {
@@ -195,20 +210,7 @@ export async function getCategoryById(id: string): Promise<CategoryRow | null> {
 
   const snap = await adminDb.collection('investmentCategories').doc(id).get();
   if (!snap.exists) return null;
-  const d = snap.data()!;
-  return {
-    id: snap.id,
-    title: d.title ?? '',
-    description: d.description ?? '',
-    imageUrl: d.imageUrl ?? '',
-    dailyProfitRate: Number(d.dailyProfitRate) || 0,
-    payoutModel: d.payoutModel === 'monthly_capital_and_profit' ? d.payoutModel : undefined,
-    profitPercent: typeof d.profitPercent === 'number' ? d.profitPercent : undefined,
-    expectedTotalReturn: d.payoutModel === 'monthly_capital_and_profit' ? Number(d.expectedTotalReturn) : undefined,
-    minInvestment: Number(d.minInvestment) || 0,
-    durationMonths: Number(d.durationMonths) || CATEGORY_DURATION_MONTHS,
-    isActive: Boolean(d.isActive),
-  };
+  return categoryFromDoc(snap.id, snap.data()!);
 }
 
 export async function listUsers(): Promise<UserRow[]> {

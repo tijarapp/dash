@@ -13,7 +13,9 @@ import { requireAdmin } from './session';
 import { DEMO_MODE } from './demo';
 import { chargeReasonDetails } from './chargeReasons';
 import {
+  FREE_PAYOUT_MODEL,
   MONTHLY_PAYOUT_MODEL,
+  freeTermsFromMonthlyReturn,
   monthlyTermsFromPercent,
   validateMonthlyTerms,
   validateProfitPercent,
@@ -29,9 +31,13 @@ function isValidTelegramSupport(value: string): boolean {
   return /^[a-zA-Z][\w]{4,31}$/.test(username);
 }
 
-function categoryFinancialFields(formData: FormData) {
-  const minInvestment = Number(formData.get('minInvestment'));
+function categoryFinancialFields(formData: FormData, isFree: boolean) {
   const durationMonths = Number(formData.get('durationMonths'));
+  if (isFree) {
+    const terms = freeTermsFromMonthlyReturn(Number(formData.get('monthlyReturn')), durationMonths);
+    return { ...terms, minInvestment: 0, isFree: true, payoutModel: FREE_PAYOUT_MODEL };
+  }
+  const minInvestment = Number(formData.get('minInvestment'));
   const rawPercent = String(formData.get('profitPercent') ?? '').trim();
   if (!rawPercent) throw new Error('حدد نسبة الربح لكامل المدة');
   const terms = monthlyTermsFromPercent(minInvestment, durationMonths, Number(rawPercent));
@@ -49,7 +55,7 @@ export async function createCategory(
 ): Promise<FormActionState> {
   try {
     await requireAdmin();
-    const financial = categoryFinancialFields(formData);
+    const financial = categoryFinancialFields(formData, formData.get('isFree') === 'true');
 
     if (DEMO_MODE) {
       revalidatePath('/categories');
@@ -61,7 +67,7 @@ export async function createCategory(
       description: String(formData.get('description') ?? ''),
       imageUrl: String(formData.get('imageUrl') ?? ''),
       ...financial,
-      rateHistory: [rateHistoryEntry(financial.profitPercent)],
+      ...('profitPercent' in financial ? { rateHistory: [rateHistoryEntry(financial.profitPercent)] } : {}),
       isActive: true,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -86,7 +92,8 @@ export async function updateCategory(
       ? (await import('./demo')).demoCategories.find((category) => category.id === id)
       : (await adminDb.collection('investmentCategories').doc(id).get()).data();
     if (!existing) return { error: 'الفئة غير موجودة' };
-    const financial = categoryFinancialFields(formData);
+    // A category keeps its type: paid and free investments are never converted.
+    const financial = categoryFinancialFields(formData, existing.payoutModel === FREE_PAYOUT_MODEL);
     const title = String(formData.get('title') ?? '');
     const imageUrl = String(formData.get('imageUrl') ?? '');
     const data = {
@@ -112,10 +119,13 @@ export async function updateCategory(
       const current = (await txn.get(categoryRef)).data();
       if (!current) throw new Error('الفئة غير موجودة');
       const history = Array.isArray(current.rateHistory) ? current.rateHistory : [];
-      const changed = history.length === 0 || current.profitPercent !== financial.profitPercent;
+      const changed = 'profitPercent' in financial &&
+        (history.length === 0 || current.profitPercent !== financial.profitPercent);
       txn.update(categoryRef, {
         ...data,
-        ...(changed ? { rateHistory: [...history, rateHistoryEntry(financial.profitPercent)] } : {}),
+        ...(changed && 'profitPercent' in financial
+          ? { rateHistory: [...history, rateHistoryEntry(financial.profitPercent)] }
+          : {}),
       });
     });
 
@@ -163,11 +173,19 @@ export async function toggleCategory(id: string, isActive: boolean) {
   const ref = adminDb.collection('investmentCategories').doc(id);
   if (isActive) {
     const data = (await ref.get()).data();
-    if (!data || data.payoutModel !== MONTHLY_PAYOUT_MODEL || typeof data.profitPercent !== 'number' ||
+    const incomplete = !data || (data.payoutModel === FREE_PAYOUT_MODEL
+      ? (() => {
+          try {
+            freeTermsFromMonthlyReturn(Number(data.monthlyReturn), Number(data.durationMonths));
+            return false;
+          } catch {
+            return true;
+          }
+        })()
+      : data.payoutModel !== MONTHLY_PAYOUT_MODEL || typeof data.profitPercent !== 'number' ||
         validateProfitPercent(data.profitPercent) ||
-        validateMonthlyTerms(Number(data.minInvestment), Number(data.durationMonths), Number(data.expectedTotalReturn))) {
-      throw new Error('أكمل بيانات الاستثمار الشهرية أولاً');
-    }
+        validateMonthlyTerms(Number(data.minInvestment), Number(data.durationMonths), Number(data.expectedTotalReturn)));
+    if (incomplete) throw new Error('أكمل بيانات الاستثمار الشهرية أولاً');
   }
   await ref.update({ isActive });
   revalidatePath('/categories');
@@ -179,15 +197,15 @@ export async function deleteCategory(id: string) {
     revalidatePath('/categories');
     return;
   }
-  // Claims read the category's rate history, so it must outlive its running investments.
-  const running = await adminDb
+  // Any subscriber (active or finished) blocks deletion: claims read the
+  // category's rate history and investors still see the category on their record.
+  const investors = await adminDb
     .collection('investments')
     .where('categoryId', '==', id)
-    .where('status', '==', 'active')
     .limit(1)
     .get();
-  if (!running.empty) {
-    throw new Error('لا يمكن حذف فئة فيها استثمارات نشطة. أوقف الفئة بدلاً من حذفها.');
+  if (!investors.empty) {
+    throw new Error('لا يمكن حذف فئة فيها مستثمرون. أوقف الفئة بدلاً من حذفها.');
   }
   await adminDb.collection('investmentCategories').doc(id).delete();
   revalidatePath('/categories');

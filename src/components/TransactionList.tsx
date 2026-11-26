@@ -16,6 +16,7 @@ const typeLabels: Record<string, string> = {
   withdraw: 'سحب',
   profit: 'ربح',
   monthly_payout: 'دفعة شهرية (رأس مال وربح)',
+  referral_bonus: 'مكافأة دعوة صديق',
   invest: 'استثمار',
   ...khairTransactionLabels,
 };

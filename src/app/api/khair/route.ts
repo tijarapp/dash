@@ -67,6 +67,37 @@ export async function GET(request: NextRequest) {
         })),
       });
     }
+    if (params.has('purchasersRoundId')) {
+      // Users who hold an active card of this type in the round: the pool winners are picked from.
+      const roundId = params.get('purchasersRoundId');
+      const cardId = params.get('cardId');
+      if (!validId(roundId) || !validId(cardId)) throw new Error('معرّف غير صالح');
+      const rows = await adminDb
+        .collection('khairPurchases')
+        .where('roundId', '==', roundId)
+        .where('cardId', '==', cardId)
+        .where('status', '==', 'active')
+        .get();
+      const chances = new Map<string, number>();
+      for (const doc of rows.docs) {
+        const userId = doc.get('userId');
+        if (typeof userId === 'string') chances.set(userId, (chances.get(userId) ?? 0) + (Number(doc.get('chances')) || 0));
+      }
+      const users = chances.size
+        ? await adminDb.getAll(...[...chances.keys()].map((id) => adminDb.doc(`users/${id}`)))
+        : [];
+      return NextResponse.json({
+        purchasers: users
+          .filter((doc) => doc.exists)
+          .map((doc) => ({
+            userId: doc.id,
+            userName: doc.get('name') ?? '',
+            userPhone: doc.get('phone') ?? '',
+            referralCode: doc.get('referralCode') ?? '',
+            chances: chances.get(doc.id) ?? 0,
+          })),
+      });
+    }
     if (params.has('userId')) {
       const userId = params.get('userId');
       if (!validId(userId)) throw new Error('معرّف غير صالح');
@@ -155,8 +186,54 @@ export async function POST(request: NextRequest) {
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       });
+    } else if (body.action === 'saveWinners') {
+      const { roundId, visibility, winners } = body;
+      if (!validId(roundId)) throw new Error('معرّف الجولة غير صالح');
+      if (!['auto', 'shown', 'hidden'].includes(visibility)) throw new Error('خيار الإظهار غير صالح');
+      if (!Array.isArray(winners) || winners.length > 500) throw new Error('قائمة الفائزين غير صالحة');
+      const seen = new Set<string>();
+      for (const winner of winners) {
+        if (!KHAIR_CARDS.some((card) => card.id === winner?.cardId)) throw new Error('نوع البطاقة غير صالح');
+        if (!validId(winner.userId)) throw new Error('معرّف المستخدم غير صالح');
+        if (typeof winner.amount !== 'number' || !Number.isFinite(winner.amount) || winner.amount <= 0 || winner.amount > 1_000_000_000)
+          throw new Error('مبلغ الفوز يجب أن يكون رقماً موجباً');
+        const key = `${winner.cardId}:${winner.userId}`;
+        if (seen.has(key)) throw new Error('لا يمكن تكرار نفس الفائز في نفس البطاقة');
+        seen.add(key);
+      }
+      const roundRef = adminDb.doc(`khairRounds/${roundId}`);
+      const round = await roundRef.get();
+      if (!round.exists) throw new Error('الجولة غير موجودة');
+      // Each winner must hold an active card of that type in this round.
+      const userIds = [...new Set(winners.map((w: { userId: string }) => w.userId))];
+      const [userDocs, purchaseDocs] = await Promise.all([
+        userIds.length ? adminDb.getAll(...userIds.map((id) => adminDb.doc(`users/${id}`))) : [],
+        adminDb.collection('khairPurchases').where('roundId', '==', roundId).where('status', '==', 'active').get(),
+      ]);
+      const bought = new Set(purchaseDocs.docs.map((doc) => `${doc.get('cardId')}:${doc.get('userId')}`));
+      const users = new Map(userDocs.map((doc) => [doc.id, doc]));
+      const cardNames = new Map<string, string>();
+      for (const doc of await adminDb.getAll(...KHAIR_CARDS.map((card) => adminDb.doc(`khairCards/${card.id}`))))
+        cardNames.set(doc.id, doc.get('name') ?? KHAIR_CARDS.find((card) => card.id === doc.id)!.name);
+      const saved = winners.map((winner: { cardId: string; userId: string; amount: number }) => {
+        const user = users.get(winner.userId);
+        if (!user?.exists) throw new Error('أحد الفائزين غير موجود');
+        if (!bought.has(`${winner.cardId}:${winner.userId}`))
+          throw new Error(`«${user.get('name') ?? ''}» لم يشترِ هذه البطاقة في هذه الجولة`);
+        return {
+          cardId: winner.cardId,
+          cardName: cardNames.get(winner.cardId) ?? '',
+          userId: winner.userId,
+          userName: user.get('name') ?? '',
+          referralCode: user.get('referralCode') ?? '',
+          amount: winner.amount,
+        };
+      });
+      await roundRef.update({ winners: saved, winnersVisibility: visibility, winnersUpdatedAt: FieldValue.serverTimestamp() });
     } else if (body.action === 'settings') {
-      const { supportWhatsapp = '' } = body;
+      const { supportWhatsapp = '', referralBonus = 50 } = body;
+      if (typeof referralBonus !== 'number' || !Number.isFinite(referralBonus) || referralBonus < 0 || referralBonus > 1_000_000)
+        throw new Error('مكافأة الدعوة يجب أن تكون رقماً بين 0 و1,000,000');
       const rawUrls =
         body.defaultBannerUrls ??
         (body.defaultBannerUrl ? [body.defaultBannerUrl] : []);
@@ -188,6 +265,7 @@ export async function POST(request: NextRequest) {
             defaultBannerUrl,
             defaultBannerUrls,
             supportWhatsapp,
+            referralBonus,
             ...(!existing.exists ? { currentRoundId: null } : {}),
           },
           { merge: true },

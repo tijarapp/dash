@@ -23,7 +23,11 @@ export default function CategoryCardActions({ category }: { category: CategoryRo
         </ActionButton>
       </ConfirmForm> : <span className="text-xs text-amber-800">أكمل التفاصيل الشهرية أولاً</span>}
 
-      <ConfirmForm
+      {(category.investorCount ?? 0) > 0 ? (
+        <span className="max-w-[10rem] text-xs leading-5 text-gray-500" title="لا يمكن حذف فئة فيها مستثمرون">
+          لا يمكن الحذف: {category.investorCount!.toLocaleString('en-US')} مشترك
+        </span>
+      ) : <ConfirmForm
         action={deleteCategory.bind(null, category.id)}
         title="تأكيد حذف الفئة"
         message={`هل تريد حذف فئة «${category.title}» نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`}
@@ -33,7 +37,7 @@ export default function CategoryCardActions({ category }: { category: CategoryRo
         <ActionButton pendingText="جاري الحذف..." className="text-red-600 hover:bg-red-50">
           حذف
         </ActionButton>
-      </ConfirmForm>
+      </ConfirmForm>}
     </>
   );
 }

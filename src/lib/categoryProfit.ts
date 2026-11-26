@@ -104,3 +104,19 @@ export function percentFromTotal(capital: number, total: number | undefined): nu
   if (!Number.isFinite(capital) || capital <= 0 || total === undefined || !Number.isFinite(total)) return MIN_PROFIT_PERCENT;
   return clampProfitPercent(((total - capital) / capital) * 100);
 }
+
+
+/** Free (trial) investment: no capital is paid or returned, only a fixed monthly return. */
+export const FREE_PAYOUT_MODEL = 'free_monthly_return' as const;
+
+export function freeTermsFromMonthlyReturn(monthlyReturn: number, months: number) {
+  if (!Number.isFinite(monthlyReturn) || monthlyReturn <= 0) throw new Error('أدخل عائداً شهرياً أكبر من صفر');
+  const units = Math.round(monthlyReturn * 100);
+  if (!Number.isSafeInteger(units) || Math.abs(monthlyReturn * 100 - units) > 0.00001) {
+    throw new Error('أدخل مبلغاً صالحاً بمنزلتين عشريتين كحد أقصى');
+  }
+  if (!Number.isInteger(months) || months < 1 || months > 120) throw new Error('المدة يجب أن تكون بين شهر و120 شهراً');
+  const total = Math.round(units * months) / 100;
+  if (!Number.isSafeInteger(Math.round(total * 100))) throw new Error('إجمالي المبلغ أكبر من الحد المسموح');
+  return { monthlyReturn, durationMonths: months, expectedTotalReturn: total };
+}
