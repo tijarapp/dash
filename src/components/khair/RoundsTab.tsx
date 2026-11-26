@@ -268,7 +268,7 @@ export default function RoundsTab({
 
       {winnersFor ? (
         <WinnersModal
-          round={winnersFor}
+          round={data.rounds.find((round) => round.id === winnersFor.id) ?? winnersFor}
           cards={data.cards}
           busy={busy}
           run={run}

@@ -38,6 +38,7 @@ export type KhairWinner = {
   userName: string;
   referralCode: string;
   amount: number;
+  paidAt?: string;
 };
 export type KhairPurchase = {
   id: string;

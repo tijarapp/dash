@@ -35,13 +35,13 @@ const digitsOnly = (value: string) => normalizeDigits(value).replace(/\D/g, '');
 export default function WinnerPicker({
   card,
   roundId,
-  selectedId,
+  selectedIds,
   disabled,
   onSelect,
 }: {
   card: KhairCard;
   roundId: string;
-  selectedId?: string;
+  selectedIds: ReadonlySet<string>;
   disabled: boolean;
   onSelect: (purchaser: Purchaser) => void;
 }) {
@@ -131,7 +131,7 @@ export default function WinnerPicker({
             <li key={purchaser.userId}>
               <button
                 type="button"
-                disabled={disabled}
+                disabled={disabled || selectedIds.has(purchaser.userId)}
                 onClick={() => onSelect(purchaser)}
                 className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2 text-start hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-brand-blue disabled:opacity-50"
               >
@@ -144,7 +144,7 @@ export default function WinnerPicker({
                   </span>
                 </span>
                 <span className="shrink-0 text-xs font-semibold text-blue-800">
-                  {selectedId === purchaser.userId ? 'الفائز المختار' : 'اختيار'}
+                  {selectedIds.has(purchaser.userId) ? 'تم الاختيار' : 'إضافة'}
                 </span>
               </button>
             </li>
